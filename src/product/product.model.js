@@ -9,6 +9,7 @@ const productSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+
   price: {
     type: Number,
     required: true,
@@ -24,6 +25,30 @@ const productSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  placeholderUID: {
+    type: String,
+    required: true,
+  },
+  placeholderUsername: {
+    type: String,
+    required: true,
+  },
+  productQuantity: [
+    {
+      quantity: {
+        type: String,
+        required: true,
+      },
+      price: {
+        type: Number,
+        required: true,
+      },
+      image: {
+        type: String,
+        required: true,
+      },
+    },
+  ],
   createdAt: {
     type: Date,
     default: Date.now,

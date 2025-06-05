@@ -2,14 +2,19 @@ const Product = require("./product.model");
 
 const postAProduct = async (req, res) => {
   try {
-    const newProduct = await Product({ ...req.body });
+    const newProduct = new Product({ ...req.body });
     await newProduct.save();
     res
       .status(200)
       .send({ message: "Product Created Successfully", newProduct });
   } catch (error) {
-    console.error("Error creating products", error);
-    res.status(500).send({ message: "Failed to create products" });
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .send({ message: "Validation Error", errors: error.errors });
+    }
+    console.error("Error creating product", error);
+    res.status(500).send({ message: "Failed to create product" });
   }
 };
 
