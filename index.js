@@ -12,7 +12,7 @@ dbConnect();
 app.use(express.json());
 app.use(
   cors({
-    origin: ["https://xenonepal-seven.vercel.app"],
+    origin: ["https://xenonepal.vercel.app"],
     credentials: true,
   })
 );
