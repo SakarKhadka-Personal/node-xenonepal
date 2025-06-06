@@ -10,8 +10,16 @@ const productSchema = new mongoose.Schema({
     required: true,
   },
 
-  price: {
+  basePrice: {
     type: Number,
+    required: true,
+  },
+  maxPrice: {
+    type: Number,
+    required: true,
+  },
+  currencyName: {
+    type: String,
     required: true,
   },
   category: {
@@ -43,6 +51,7 @@ const productSchema = new mongoose.Schema({
         type: Number,
         required: true,
       },
+
       image: {
         type: String,
         required: true,

@@ -13,6 +13,7 @@ app.use(express.json());
 app.use(
   cors({
     origin: ["https://xenonepal.vercel.app"],
+    // origin: ["http://localhost:5173"],
     credentials: true,
   })
 );
@@ -20,6 +21,10 @@ app.use(
 // Product Routes
 const productRoute = require("./src/product/product.route");
 app.use("/api/products", productRoute);
+
+// User Routes
+const userRoute = require("./src/user/user.route");
+app.use("/api/users", userRoute);
 
 //Root Route For Checking Server Status
 app.get("/", function (req, res) {

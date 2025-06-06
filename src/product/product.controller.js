@@ -38,9 +38,9 @@ const getSingleProduct = async (req, res) => {
     const product = await Product.findById(id);
 
     if (!product) {
-      res.status(404).send({ message: "Product Not Found" });
+      return res.status(404).send({ message: "Product Not Found" });
     }
-    res.status(200).send(product);
+    res.status(200).send({ message: "Product fetched successfully", product });
   } catch (error) {
     console.error("Error fetching product", error);
     res.status(500).send({ message: "Failed to fetch product    " });
@@ -55,13 +55,14 @@ const updateProduct = async (req, res) => {
       new: true,
     });
 
-    if (!updateProduct) {
-      res.status(404).send({ message: "Product Not Found" });
+    if (!updatedProduct) {
+      return res.status(404).send({ message: "Product Not Found" });
     }
 
-    res
-      .status(200)
-      .send({ message: "Product Updated Successfully", updateProduct });
+    res.status(200).send({
+      message: "Product Updated Successfully",
+      product: updatedProduct,
+    });
   } catch (error) {
     console.error("Error Updating product", error);
     res.status(500).send({ message: "Failed to Update product    " });
@@ -74,13 +75,14 @@ const deleteProduct = async (req, res) => {
     const { id } = req.params;
     const deletedProduct = await Product.findByIdAndDelete(id);
 
-    if (!deleteProduct) {
-      res.status(404).send({ message: "Product Not Found" });
+    if (!deletedProduct) {
+      return res.status(404).send({ message: "Product Not Found" });
     }
 
-    res
-      .status(200)
-      .send({ message: "Product Deleted Successfully", deleteProduct });
+    res.status(200).send({
+      message: "Product Deleted Successfully",
+      product: deletedProduct,
+    });
   } catch (error) {
     console.error("Error Deleing  product", error);
     res.status(500).send({ message: "Failed to Delete product    " });
