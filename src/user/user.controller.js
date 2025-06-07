@@ -200,6 +200,49 @@ const getUserStats = async (req, res) => {
   }
 };
 
+// Sync user data from Firebase
+const syncUser = async (req, res) => {
+  try {
+    const { name, email, googleId, photoURL } = req.body;
+
+    // Try to find existing user
+    let user = await User.findOne({
+      $or: [{ googleId }, { email }],
+    });
+
+    if (user) {
+      // Update existing user
+      user.lastLogin = new Date();
+      if (googleId && !user.googleId) {
+        user.googleId = googleId;
+      }
+      if (name) user.name = name;
+      if (photoURL) user.photoURL = photoURL;
+
+      await user.save();
+    } else {
+      // Create new user
+      user = await User.create({
+        name,
+        email,
+        googleId,
+        photoURL,
+        role: "user",
+        status: "active",
+        lastLogin: new Date(),
+      });
+    }
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Error in syncUser:", error);
+    res.status(500).json({
+      message: "Error synchronizing user",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getSingleUser,
@@ -207,4 +250,5 @@ module.exports = {
   updateUser,
   deleteUser,
   getUserStats,
+  syncUser,
 };

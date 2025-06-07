@@ -6,9 +6,13 @@ const {
   updateUser,
   deleteUser,
   getUserStats,
+  syncUser,
 } = require("./user.controller");
 
 const router = express.Router();
+
+// Sync user from Firebase
+router.post("/sync", syncUser);
 
 // Get user statistics
 router.get("/stats", getUserStats);
@@ -20,12 +24,12 @@ router.get("/", getAllUsers);
 router.get("/:id", getSingleUser);
 
 // Create user
-router.post("/create", createUser);
+router.post("/", createUser);
 
 // Update user
-router.put("/edit/:id", updateUser);
+router.patch("/:id", updateUser);
 
 // Delete user
-router.delete("/delete/:id", deleteUser);
+router.delete("/:id", deleteUser);
 
 module.exports = router;
