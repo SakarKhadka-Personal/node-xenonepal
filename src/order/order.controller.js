@@ -4,17 +4,8 @@ const Order = require("./order.model");
 exports.createOrder = async (req, res) => {
   try {
     const { order, paymentMethod, paymentScreenshot, userId } = req.body;
-    // If userId is a string but not a valid ObjectId, set to undefined
-    let userIdToSave = undefined;
-    if (
-      userId &&
-      typeof userId === "string" &&
-      userId.match(/^[0-9a-fA-F]{24}$/)
-    ) {
-      userIdToSave = userId;
-    }
     const newOrder = await Order.create({
-      userId: userIdToSave,
+      userId, // Store Firebase UID directly
       order,
       paymentMethod,
       paymentScreenshot,
@@ -42,8 +33,7 @@ exports.getAllOrders = async (req, res) => {
     const orders = await Order.find(filter)
       .sort({ createdAt: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .populate("userId", "name email");
+      .skip((page - 1) * limit);
 
     // Get total count for pagination
     const total = await Order.countDocuments(filter);
@@ -62,7 +52,7 @@ exports.getAllOrders = async (req, res) => {
 // Get orders for a specific user
 exports.getUserOrders = async (req, res) => {
   try {
-    const userId = req.user ? req.user._id : req.params.userId;
+    const userId = req.params.userId; // This will be the Firebase UID
     const orders = await Order.find({ userId }).sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
@@ -92,7 +82,7 @@ exports.updateOrderStatus = async (req, res) => {
       id,
       { status: status.toLowerCase() },
       { new: true }
-    ).populate("userId", "name email");
+    );
 
     if (!updatedOrder)
       return res.status(404).json({ error: "Order not found" });

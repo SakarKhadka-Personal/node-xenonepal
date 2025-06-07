@@ -2,13 +2,13 @@ const mongoose = require("mongoose");
 
 const orderSchema = new mongoose.Schema({
   userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: false,
-  }, // made not required
+    type: String, // Changed to String to store Firebase UID
+    required: true,
+    index: true,
+  },
   order: { type: Object, required: true },
   paymentMethod: { type: String, required: true },
-  paymentScreenshot: { type: String }, // URL or filename
+  paymentScreenshot: { type: String },
   status: { type: String, default: "pending" },
   createdAt: { type: Date, default: Date.now },
 });
