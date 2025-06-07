@@ -15,7 +15,7 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: function() {
+    required: function () {
       return !this.googleId; // Password required only if not Google user
     },
   },
@@ -41,13 +41,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
-  address: {
-    street: { type: String, default: "" },
-    city: { type: String, default: "" },
-    state: { type: String, default: "" },
-    zipCode: { type: String, default: "" },
-    country: { type: String, default: "" },
-  },
+
   lastLogin: {
     type: Date,
     default: Date.now,
@@ -63,16 +57,19 @@ const userSchema = new mongoose.Schema({
 });
 
 // Update the updatedAt field before saving
-userSchema.pre('save', function(next) {
+userSchema.pre("save", function (next) {
   this.updatedAt = Date.now();
   next();
 });
 
 // Update the updatedAt field before updating
-userSchema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], function(next) {
-  this.set({ updatedAt: Date.now() });
-  next();
-});
+userSchema.pre(
+  ["findOneAndUpdate", "updateOne", "updateMany"],
+  function (next) {
+    this.set({ updatedAt: Date.now() });
+    next();
+  }
+);
 
 const User = mongoose.model("User", userSchema);
 module.exports = User;
