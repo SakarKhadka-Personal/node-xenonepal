@@ -25,6 +25,10 @@ app.use("/api/products", productRoute);
 const userRoute = require("./src/user/user.route");
 app.use("/api/users", userRoute);
 
+// Order Routes
+const orderRoute = require("./src/order/order.route");
+app.use("/api/orders", orderRoute);
+
 //Root Route For Checking Server Status
 app.get("/", function (req, res) {
   res.send("Server Is Running Perfectly");

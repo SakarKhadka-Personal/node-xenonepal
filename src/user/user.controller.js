@@ -4,8 +4,14 @@ const bcrypt = require("bcryptjs");
 // Get All Users
 const getAllUsers = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = "", role = "", status = "" } = req.query;
-    
+    const {
+      page = 1,
+      limit = 10,
+      search = "",
+      role = "",
+      status = "",
+    } = req.query;
+
     // Build filter object
     const filter = {};
     if (search) {
@@ -47,7 +53,7 @@ const getSingleUser = async (req, res) => {
     if (!user) {
       return res.status(404).send({ message: "User Not Found" });
     }
-    res.status(200).send({ message: "User fetched successfully", user });
+    res.status(200).send({ message: "User fetched successfully" });
   } catch (error) {
     console.error("Error fetching user", error);
     res.status(500).send({ message: "Failed to fetch user" });
@@ -57,12 +63,22 @@ const getSingleUser = async (req, res) => {
 // Create User
 const createUser = async (req, res) => {
   try {
-    const { name, email, password, role = "user", status = "active", phone, address } = req.body;
+    const {
+      name,
+      email,
+      password,
+      role = "user",
+      status = "active",
+      phone,
+      address,
+    } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).send({ message: "User with this email already exists" });
+      return res
+        .status(400)
+        .send({ message: "User with this email already exists" });
     }
 
     // Hash password if provided
