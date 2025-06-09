@@ -29,6 +29,10 @@ app.use("/api/users", userRoute);
 const orderRoute = require("./src/order/order.route");
 app.use("/api/orders", orderRoute);
 
+// Settings Routes
+const settingsRoute = require("./src/settings/setting.route");
+app.use("/api/settings", settingsRoute);
+
 //Root Route For Checking Server Status
 app.get("/", function (req, res) {
   res.send("Server Is Running Perfectly");
