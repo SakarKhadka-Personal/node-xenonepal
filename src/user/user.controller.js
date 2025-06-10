@@ -1,5 +1,4 @@
 const User = require("./user.model");
-const bcrypt = require("bcryptjs");
 
 // Get All Users
 const getAllUsers = async (req, res) => {
@@ -22,9 +21,7 @@ const getAllUsers = async (req, res) => {
     }
     if (role) filter.role = role;
     if (status) filter.status = status;
-
     const users = await User.find(filter)
-      .select("-password") // Exclude password from response
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -48,7 +45,7 @@ const getAllUsers = async (req, res) => {
 const getSingleUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await User.findById(id).select("-password");
+    const user = await User.findById(id);
 
     if (!user) {
       return res.status(404).send({ message: "User Not Found" });
@@ -66,46 +63,36 @@ const createUser = async (req, res) => {
     const {
       name,
       email,
-      password,
+      googleId,
       role = "user",
       status = "active",
       phone,
-      address,
+      photoURL,
     } = req.body;
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res
-        .status(400)
-        .send({ message: "User with this email already exists" });
-    }
+    const existingUser = await User.findOne({
+      $or: [{ email }, { googleId }],
+    });
 
-    // Hash password if provided
-    let hashedPassword = "";
-    if (password) {
-      hashedPassword = await bcrypt.hash(password, 12);
+    if (existingUser) {
+      return res.status(400).send({ message: "User already exists" });
     }
 
     const newUser = new User({
       name,
       email,
-      password: hashedPassword,
+      googleId,
+      photoURL,
       role,
       status,
       phone,
-      address,
     });
 
     await newUser.save();
-
-    // Remove password from response
-    const userResponse = newUser.toObject();
-    delete userResponse.password;
-
     res.status(201).send({
       message: "User Created Successfully",
-      user: userResponse,
+      user: newUser,
     });
   } catch (error) {
     if (error.name === "ValidationError") {
@@ -124,16 +111,10 @@ const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = { ...req.body };
-
-    // Hash password if it's being updated
-    if (updateData.password) {
-      updateData.password = await bcrypt.hash(updateData.password, 12);
-    }
-
     const updatedUser = await User.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
-    }).select("-password");
+    });
 
     if (!updatedUser) {
       return res.status(404).send({ message: "User Not Found" });
@@ -203,37 +184,76 @@ const getUserStats = async (req, res) => {
 // Sync user data from Firebase
 const syncUser = async (req, res) => {
   try {
+    console.log("Sync user request body:", req.body);
     const { name, email, googleId, photoURL } = req.body;
+
+    if (!email || !googleId) {
+      console.log("Missing required fields:", { email, googleId });
+      return res.status(400).json({
+        message: "Email and googleId are required",
+      });
+    }
+
+    console.log("Looking for existing user with email or googleId:", {
+      email,
+      googleId,
+    });
 
     // Try to find existing user
     let user = await User.findOne({
       $or: [{ googleId }, { email }],
     });
 
-    if (user) {
-      // Update existing user
-      user.lastLogin = new Date();
-      if (googleId && !user.googleId) {
-        user.googleId = googleId;
-      }
-      if (name) user.name = name;
-      if (photoURL) user.photoURL = photoURL;
+    console.log("Found existing user:", user ? "Yes" : "No");
 
-      await user.save();
+    if (user) {
+      try {
+        console.log("Updating existing user:", user._id);
+        // Update existing user
+        user.lastLogin = new Date();
+        if (googleId && !user.googleId) {
+          user.googleId = googleId;
+        }
+        if (name) user.name = name;
+        if (photoURL) user.photoURL = photoURL;
+
+        user = await user.save();
+        console.log("User updated successfully");
+      } catch (saveErr) {
+        console.error("Error saving existing user:", saveErr);
+        return res.status(500).json({
+          message: "Error updating existing user",
+          error: saveErr.message,
+        });
+      }
     } else {
-      // Create new user
-      user = await User.create({
-        name,
-        email,
-        googleId,
-        photoURL,
-        role: "user",
-        status: "active",
-        lastLogin: new Date(),
-      });
+      try {
+        console.log("Creating new user");
+        // Create new user
+        user = await User.create({
+          name: name || email.split("@")[0],
+          email,
+          googleId,
+          photoURL: photoURL || "",
+          role: "user",
+          status: "active",
+          lastLogin: new Date(),
+        });
+        console.log("User created successfully:", user._id);
+      } catch (createErr) {
+        console.error("Error creating new user:", createErr);
+        return res.status(500).json({
+          message: "Error creating new user",
+          error: createErr.message,
+        });
+      }
     }
 
-    res.status(200).json(user);
+    console.log("Sending success response");
+    res.status(200).json({
+      message: "User synchronized successfully",
+      ...user.toObject(),
+    });
   } catch (error) {
     console.error("Error in syncUser:", error);
     res.status(500).json({

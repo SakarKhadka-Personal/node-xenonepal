@@ -13,17 +13,10 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
   },
-  password: {
-    type: String,
-    required: function () {
-      return !this.googleId; // Password required only if not Google user
-    },
-    required: true,
-    trim: true,
-    minlength: 6,
-  },
   googleId: {
     type: String,
+    required: true,
+    unique: true,
     sparse: true, // Allows multiple null values
   },
   photoURL: {
