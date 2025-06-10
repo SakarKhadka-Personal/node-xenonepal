@@ -1,4 +1,5 @@
 const User = require("./user.model");
+const Order = require("../order/order.model");
 
 // Get All Users
 const getAllUsers = async (req, res) => {
@@ -21,16 +22,34 @@ const getAllUsers = async (req, res) => {
     }
     if (role) filter.role = role;
     if (status) filter.status = status;
+
     const users = await User.find(filter)
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
+    // Get order statistics for each user
+    const usersWithStats = await Promise.all(
+      users.map(async (user) => {
+        const userOrders = await Order.find({ userId: user.googleId });
+        const orderCount = userOrders.length;
+        const totalSpent = userOrders.reduce((sum, order) => {
+          return sum + (order.order?.price || 0);
+        }, 0);
+
+        return {
+          ...user.toObject(),
+          orderCount,
+          totalSpent,
+        };
+      })
+    );
+
     const total = await User.countDocuments(filter);
 
     res.status(200).send({
       message: "Users fetched successfully",
-      users,
+      users: usersWithStats,
       totalPages: Math.ceil(total / limit),
       currentPage: page,
       total,
@@ -263,6 +282,39 @@ const syncUser = async (req, res) => {
   }
 };
 
+// Get User by Google ID (for order lookups)
+const getUserByGoogleId = async (req, res) => {
+  try {
+    const { googleId } = req.params;
+    const user = await User.findOne({ googleId });
+
+    if (!user) {
+      return res.status(404).send({ message: "User Not Found" });
+    }
+
+    // Get order statistics for this user
+    const userOrders = await Order.find({ userId: googleId });
+    const orderCount = userOrders.length;
+    const totalSpent = userOrders.reduce((sum, order) => {
+      return sum + (order.order?.price || 0);
+    }, 0);
+
+    const userWithStats = {
+      ...user.toObject(),
+      orderCount,
+      totalSpent,
+    };
+
+    res.status(200).send({
+      message: "User fetched successfully",
+      user: userWithStats,
+    });
+  } catch (error) {
+    console.error("Error fetching user by googleId", error);
+    res.status(500).send({ message: "Failed to fetch user" });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getSingleUser,
@@ -271,4 +323,5 @@ module.exports = {
   deleteUser,
   getUserStats,
   syncUser,
+  getUserByGoogleId,
 };

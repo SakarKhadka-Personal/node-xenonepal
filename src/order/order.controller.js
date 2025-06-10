@@ -1,4 +1,5 @@
 const Order = require("./order.model");
+const User = require("../user/user.model");
 
 // Create a new order
 exports.createOrder = async (req, res) => {
@@ -33,13 +34,60 @@ exports.getAllOrders = async (req, res) => {
     const orders = await Order.find(filter)
       .sort({ createdAt: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .skip((page - 1) * limit); // Enhance orders with user information
+    console.log(`Processing ${orders.length} orders for user enhancement`);
+    const ordersWithUserInfo = await Promise.all(
+      orders.map(async (order) => {
+        try {
+          console.log(
+            `Looking up user for order ${order._id}, userId: ${order.userId}`
+          );
+          const user = await User.findOne({ googleId: order.userId });
+          console.log(
+            `User found:`,
+            user ? `${user.name} (${user.email})` : "null"
+          );
+
+          let userInfo = null;
+          if (user) {
+            // Calculate user statistics
+            const userOrders = await Order.find({ userId: order.userId });
+            const orderCount = userOrders.length;
+            const totalSpent = userOrders.reduce((sum, userOrder) => {
+              return sum + (userOrder.order?.price || 0);
+            }, 0);
+
+            userInfo = {
+              _id: user._id,
+              name: user.name,
+              email: user.email,
+              photoURL: user.photoURL,
+              status: user.status,
+              role: user.role,
+              orderCount,
+              totalSpent,
+            };
+          }
+
+          return {
+            ...order.toObject(),
+            userInfo,
+          };
+        } catch (err) {
+          console.error(`Error fetching user for order ${order._id}:`, err);
+          return {
+            ...order.toObject(),
+            userInfo: null,
+          };
+        }
+      })
+    );
 
     // Get total count for pagination
     const total = await Order.countDocuments(filter);
 
     res.json({
-      orders,
+      orders: ordersWithUserInfo,
       totalPages: Math.ceil(total / limit),
       currentPage: page,
       total,

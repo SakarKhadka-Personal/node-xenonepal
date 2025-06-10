@@ -2,6 +2,7 @@ const express = require("express");
 const {
   getAllUsers,
   getSingleUser,
+  getUserByGoogleId,
   createUser,
   updateUser,
   deleteUser,
@@ -19,6 +20,9 @@ router.get("/stats", getUserStats);
 
 // Get all users
 router.get("/", getAllUsers);
+
+// Get user by Google ID
+router.get("/google/:googleId", getUserByGoogleId);
 
 // Get single user
 router.get("/:id", getSingleUser);
