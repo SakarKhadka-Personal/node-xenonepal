@@ -12,8 +12,40 @@ dbConnect();
 // Middleware
 app.use(express.json());
 
-// ✅ Enable gzip compression
-app.use(compression());
+// ✅ Enable gzip compression with optimized settings
+app.use(
+  compression({
+    // Compress all responses
+    filter: (req, res) => {
+      // Don't compress if the request has Cache-Control: no-transform directive
+      if (
+        req.headers["cache-control"] &&
+        req.headers["cache-control"].includes("no-transform")
+      ) {
+        return false;
+      }
+      // Use compression for all other responses
+      return compression.filter(req, res);
+    },
+    // Compression level (1-9, 9 is maximum)
+    level: 6, // Good balance between compression and speed
+    // Minimum response size to compress (in bytes)
+    threshold: 1024, // 1KB
+    // Include more MIME types for compression
+    types: [
+      "text/plain",
+      "text/html",
+      "text/css",
+      "text/xml",
+      "text/javascript",
+      "application/javascript",
+      "application/xml+rss",
+      "application/json",
+      "application/xml",
+      "image/svg+xml",
+    ],
+  })
+);
 
 app.use(
   cors({
