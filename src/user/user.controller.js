@@ -203,31 +203,21 @@ const getUserStats = async (req, res) => {
 // Sync user data from Firebase
 const syncUser = async (req, res) => {
   try {
-    console.log("Sync user request body:", req.body);
     const { name, email, googleId, photoURL } = req.body;
 
     if (!email || !googleId) {
-      console.log("Missing required fields:", { email, googleId });
       return res.status(400).json({
         message: "Email and googleId are required",
       });
     }
-
-    console.log("Looking for existing user with email or googleId:", {
-      email,
-      googleId,
-    });
 
     // Try to find existing user
     let user = await User.findOne({
       $or: [{ googleId }, { email }],
     });
 
-    console.log("Found existing user:", user ? "Yes" : "No");
-
     if (user) {
       try {
-        console.log("Updating existing user:", user._id);
         // Update existing user
         user.lastLogin = new Date();
         if (googleId && !user.googleId) {
@@ -237,7 +227,6 @@ const syncUser = async (req, res) => {
         if (photoURL) user.photoURL = photoURL;
 
         user = await user.save();
-        console.log("User updated successfully");
       } catch (saveErr) {
         console.error("Error saving existing user:", saveErr);
         return res.status(500).json({
@@ -247,7 +236,6 @@ const syncUser = async (req, res) => {
       }
     } else {
       try {
-        console.log("Creating new user");
         // Create new user
         user = await User.create({
           name: name || email.split("@")[0],
@@ -258,7 +246,6 @@ const syncUser = async (req, res) => {
           status: "active",
           lastLogin: new Date(),
         });
-        console.log("User created successfully:", user._id);
       } catch (createErr) {
         console.error("Error creating new user:", createErr);
         return res.status(500).json({
@@ -268,7 +255,6 @@ const syncUser = async (req, res) => {
       }
     }
 
-    console.log("Sending success response");
     res.status(200).json({
       message: "User synchronized successfully",
       ...user.toObject(),

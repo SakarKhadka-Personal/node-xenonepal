@@ -34,20 +34,13 @@ exports.getAllOrders = async (req, res) => {
     const orders = await Order.find(filter)
       .sort({ createdAt: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit); // Enhance orders with user information
-    console.log(`Processing ${orders.length} orders for user enhancement`);
+      .skip((page - 1) * limit);
+
+    // Enhance orders with user information
     const ordersWithUserInfo = await Promise.all(
       orders.map(async (order) => {
         try {
-          console.log(
-            `Looking up user for order ${order._id}, userId: ${order.userId}`
-          );
           const user = await User.findOne({ googleId: order.userId });
-          console.log(
-            `User found:`,
-            user ? `${user.name} (${user.email})` : "null"
-          );
-
           let userInfo = null;
           if (user) {
             // Calculate user statistics
