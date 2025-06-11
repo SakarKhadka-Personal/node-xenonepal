@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const compression = require("compression");
 dbConnect = require("./src/config/db");
 const cors = require("cors");
 
@@ -10,6 +11,10 @@ dbConnect();
 
 // Middleware
 app.use(express.json());
+
+// ✅ Enable gzip compression
+app.use(compression());
+
 app.use(
   cors({
     origin: [
