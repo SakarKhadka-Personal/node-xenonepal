@@ -28,7 +28,11 @@ app.use(compression());
 
 app.use(
   cors({
-    origin: ["https://xenonepal.com", "https://www.xenonepal.com"],
+    origin: [
+      "https://xenonepal.com",
+      "https://www.xenonepal.com",
+      "http://localhost:5173",
+    ],
     credentials: true,
   })
 );
