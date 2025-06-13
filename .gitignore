@@ -1,5 +1,3 @@
-
-
 # Dependencies
 node_modules
 node_modules/
@@ -20,8 +18,12 @@ lerna-debug.log*
 .env.production.local
 config.json
 
+# System files
+.DS_Store
+
 # Logs
 logs/
+logs
 *.log
 combined.log
 error.log
@@ -35,6 +37,7 @@ pids
 
 # Coverage directory used by tools like istanbul
 coverage
+coverage/
 *.lcov
 
 # nyc test coverage
@@ -42,6 +45,9 @@ coverage
 
 # ESLint cache
 .eslintcache
+
+# Dependency directories
+node_modules/
 
 # Optional npm cache directory
 .npm
@@ -94,3 +100,10 @@ public/uploads/
 *.db
 *.sqlite
 *.sqlite3
+
+# dotenv environment variables file
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
