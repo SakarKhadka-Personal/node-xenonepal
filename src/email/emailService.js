@@ -7,6 +7,10 @@ class EmailService {
   constructor() {
     this.transporter = null;
     this.emailSettings = null;
+    this.adminEmails = [];
+    this.adminEmailsLastFetch = 0;
+    this.templateCache = new Map();
+    this.templateCacheExpiry = 300000; // 5 minutes
     this.initializeTransporter();
   }
 
@@ -72,10 +76,30 @@ class EmailService {
     // Method to reinitialize transporter when settings change
     return this.initializeTransporter();
   }
-
   async getTemplate(type) {
     try {
+      // Check cache first to reduce database queries
+      const cacheKey = `template_${type}`;
+      const now = Date.now();
+
+      if (this.templateCache.has(cacheKey)) {
+        const cached = this.templateCache.get(cacheKey);
+        if (now - cached.timestamp < this.templateCacheExpiry) {
+          return cached.template;
+        }
+        this.templateCache.delete(cacheKey);
+      }
+
       const template = await EmailTemplate.findOne({ type, isActive: true });
+
+      // Cache the template for better performance
+      if (template) {
+        this.templateCache.set(cacheKey, {
+          template,
+          timestamp: now,
+        });
+      }
+
       return template;
     } catch (error) {
       console.error("Error fetching email template:", error);
@@ -99,7 +123,7 @@ class EmailService {
         return false;
       }
 
-      // Refresh email settings in case they changed
+      // Refresh email settings in case they changed (cached)
       const emailSettings = await this.loadEmailSettings();
 
       if (!emailSettings.enableEmailNotifications) {
@@ -140,7 +164,14 @@ class EmailService {
         text: textContent,
       };
 
-      const info = await this.transporter.sendMail(mailOptions);
+      // Send email with timeout to prevent hanging
+      const info = await Promise.race([
+        this.transporter.sendMail(mailOptions),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Email send timeout")), 30000)
+        ),
+      ]);
+
       console.log(`Email sent successfully to ${to}:`, info.messageId);
       return true;
     } catch (error) {
@@ -185,7 +216,6 @@ class EmailService {
       },
     });
   }
-
   async sendWelcomeEmail(userEmail, userData) {
     return await this.sendEmail({
       to: userEmail,
@@ -196,6 +226,132 @@ class EmailService {
         registrationDate: new Date().toLocaleDateString(),
       },
     });
+  }
+
+  // Admin notification methods - optimized for minimal server load
+  async getAdminEmails() {
+    try {
+      // Cache admin emails to reduce database queries
+      if (
+        !this.adminEmails ||
+        Date.now() - this.adminEmailsLastFetch > 300000
+      ) {
+        // Cache for 5 minutes
+        const User = require("../user/user.model");
+        const admins = await User.find({ role: "admin", status: "active" })
+          .select("email")
+          .lean();
+        this.adminEmails = admins.map((admin) => admin.email).filter(Boolean);
+        this.adminEmailsLastFetch = Date.now();
+      }
+      return this.adminEmails;
+    } catch (error) {
+      console.error("Error fetching admin emails:", error);
+      return [];
+    }
+  }
+
+  async sendAdminNewOrderNotification(orderData) {
+    try {
+      const adminEmails = await this.getAdminEmails();
+      if (adminEmails.length === 0) {
+        console.log("No admin emails found for new order notification");
+        return false;
+      }
+
+      // Send to all admins in parallel for efficiency
+      const emailPromises = adminEmails.map((adminEmail) =>
+        this.sendEmail({
+          to: adminEmail,
+          templateType: "admin_new_order",
+          variables: {
+            orderId: orderData.orderId,
+            customerName: orderData.customerName,
+            customerEmail: orderData.customerEmail,
+            productName: orderData.productName,
+            quantity: orderData.quantity,
+            totalAmount: orderData.totalAmount,
+            currency: orderData.currency,
+            playerID: orderData.playerID,
+            username: orderData.username,
+            paymentMethod: orderData.paymentMethod,
+            orderDate: new Date(orderData.createdAt).toLocaleDateString(),
+          },
+        }).catch((error) => {
+          console.error(
+            `Failed to send admin notification to ${adminEmail}:`,
+            error
+          );
+          return false;
+        })
+      );
+
+      const results = await Promise.allSettled(emailPromises);
+      const successCount = results.filter(
+        (result) => result.status === "fulfilled" && result.value
+      ).length;
+      console.log(
+        `Admin new order notifications sent to ${successCount}/${adminEmails.length} admins`
+      );
+      return successCount > 0;
+    } catch (error) {
+      console.error("Error sending admin new order notification:", error);
+      return false;
+    }
+  }
+
+  async sendAdminOrderStatusUpdate(orderData, oldStatus, newStatus) {
+    try {
+      const adminEmails = await this.getAdminEmails();
+      if (adminEmails.length === 0) {
+        console.log(
+          "No admin emails found for order status update notification"
+        );
+        return false;
+      }
+
+      // Send to all admins in parallel for efficiency
+      const emailPromises = adminEmails.map((adminEmail) =>
+        this.sendEmail({
+          to: adminEmail,
+          templateType: "admin_order_status_update",
+          variables: {
+            orderId: orderData.orderId,
+            customerName: orderData.customerName,
+            customerEmail: orderData.customerEmail,
+            productName: orderData.productName,
+            oldStatus: oldStatus,
+            newStatus: newStatus,
+            totalAmount: orderData.totalAmount,
+            currency: orderData.currency,
+            playerID: orderData.playerID,
+            username: orderData.username,
+            updateDate: new Date().toLocaleDateString(),
+          },
+        }).catch((error) => {
+          console.error(
+            `Failed to send admin status update to ${adminEmail}:`,
+            error
+          );
+          return false;
+        })
+      );
+
+      const results = await Promise.allSettled(emailPromises);
+      const successCount = results.filter(
+        (result) => result.status === "fulfilled" && result.value
+      ).length;
+      console.log(
+        `Admin order status update notifications sent to ${successCount}/${adminEmails.length} admins`
+      );
+      return successCount > 0;
+    } catch (error) {
+      console.error(
+        "Error sending admin order status update notification:",
+        error
+      );
+      return false;
+    }
   }
 }
 

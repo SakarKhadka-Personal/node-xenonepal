@@ -123,6 +123,150 @@ Website: {{websiteUrl}}
           "websiteUrl",
         ],
       },
+      {
+        type: "admin_new_order",
+        subject: "🚨 New Order Alert - {{orderId}} | {{appName}}",
+        htmlContent: `
+          <html>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background-color: #dc3545; color: white; padding: 20px; text-align: center;">
+                <h1>🚨 New Order Alert!</h1>
+                <p>A new order has been placed on {{appName}}</p>
+              </div>
+              <div style="padding: 20px;">
+                <p><strong>Action Required:</strong> A new order has been received and requires processing.</p>
+                
+                <div style="background-color: #fff3cd; padding: 15px; margin: 15px 0; border-left: 4px solid #ffc107;">
+                  <h3>📋 Order Details:</h3>
+                  <p><strong>Order ID:</strong> {{orderId}}</p>
+                  <p><strong>Product:</strong> {{productName}}</p>
+                  <p><strong>Quantity:</strong> {{quantity}}</p>
+                  <p><strong>Total Amount:</strong> {{currency}} {{totalAmount}}</p>
+                  <p><strong>Payment Method:</strong> {{paymentMethod}}</p>
+                  <p><strong>Order Date:</strong> {{orderDate}}</p>
+                </div>
+
+                <div style="background-color: #d1ecf1; padding: 15px; margin: 15px 0; border-left: 4px solid #0dcaf0;">
+                  <h3>👤 Customer Information:</h3>
+                  <p><strong>Name:</strong> {{customerName}}</p>
+                  <p><strong>Email:</strong> {{customerEmail}}</p>
+                  <p><strong>Player ID:</strong> {{playerID}}</p>
+                </div>
+                
+                <p>Please process this order promptly to ensure customer satisfaction.</p>
+                
+                <a href="{{websiteUrl}}/admin/orders" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">View in Admin Panel</a>
+              </div>
+            </body>
+          </html>
+        `,
+        textContent: `🚨 NEW ORDER ALERT - {{orderId}}
+
+A new order has been placed on {{appName}} and requires processing.
+
+📋 ORDER DETAILS:
+- Order ID: {{orderId}}
+- Product: {{productName}}
+- Quantity: {{quantity}}
+- Total Amount: {{currency}} {{totalAmount}}
+- Payment Method: {{paymentMethod}}
+- Order Date: {{orderDate}}
+
+👤 CUSTOMER INFORMATION:
+- Name: {{customerName}}
+- Email: {{customerEmail}}
+- Player ID: {{playerID}}
+
+ACTION REQUIRED: Please process this order promptly.
+
+View in Admin Panel: {{websiteUrl}}/admin/orders
+
+---
+{{appName}} Admin Notification System`,
+        availableVariables: [
+          "orderId",
+          "customerName",
+          "customerEmail",
+          "productName",
+          "quantity",
+          "totalAmount",
+          "currency",
+          "playerID",
+          "username",
+          "paymentMethod",
+          "orderDate",
+          "appName",
+          "websiteUrl",
+        ],
+      },
+      {
+        type: "admin_order_status_update",
+        subject: "📋 Order Status Update - {{orderId}} | {{appName}}",
+        htmlContent: `
+          <html>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background-color: #6f42c1; color: white; padding: 20px; text-align: center;">
+                <h1>📋 Order Status Updated</h1>
+                <p>Order {{orderId}} status has been changed</p>
+              </div>
+              <div style="padding: 20px;">
+                <div style="background-color: #e7f3ff; padding: 15px; margin: 15px 0; border-left: 4px solid #007bff;">
+                  <h3>📊 Status Change:</h3>
+                  <p><strong>Order ID:</strong> {{orderId}}</p>
+                  <p><strong>Previous Status:</strong> {{oldStatus}}</p>
+                  <p><strong>New Status:</strong> {{newStatus}}</p>
+                  <p><strong>Update Date:</strong> {{updateDate}}</p>
+                </div>
+
+                <div style="background-color: #f8f9fa; padding: 15px; margin: 15px 0;">
+                  <h3>📋 Order Information:</h3>
+                  <p><strong>Customer:</strong> {{customerName}} ({{customerEmail}})</p>
+                  <p><strong>Product:</strong> {{productName}}</p>
+                  <p><strong>Amount:</strong> {{currency}} {{totalAmount}}</p>
+                  <p><strong>Player ID:</strong> {{playerID}}</p>
+                </div>
+                
+                <a href="{{websiteUrl}}/admin/orders" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">View All Orders</a>
+              </div>
+            </body>
+          </html>
+        `,
+        textContent: `📋 ORDER STATUS UPDATE - {{orderId}}
+
+Order {{orderId}} status has been updated on {{appName}}.
+
+📊 STATUS CHANGE:
+- Order ID: {{orderId}}
+- Previous Status: {{oldStatus}}
+- New Status: {{newStatus}}
+- Update Date: {{updateDate}}
+
+📋 ORDER INFORMATION:
+- Customer: {{customerName}} ({{customerEmail}})
+- Product: {{productName}}
+- Amount: {{currency}} {{totalAmount}}
+- Player ID: {{playerID}}
+
+View All Orders: {{websiteUrl}}/admin/orders
+
+---
+{{appName}} Admin Notification System`,
+        availableVariables: [
+          "orderId",
+          "customerName",
+          "customerEmail",
+          "productName",
+          "oldStatus",
+          "newStatus",
+          "totalAmount",
+          "currency",
+          "playerID",
+          "username",
+          "updateDate",
+          "appName",
+          "websiteUrl",
+        ],
+      },
     ];
 
     for (const template of templates) {

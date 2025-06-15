@@ -402,6 +402,205 @@ Need help? Contact us at {{supportEmail}}
           "currentYear",
         ],
       },
+      {
+        type: "admin_new_order",
+        subject: "🚨 New Order Alert - {{orderId}} | {{appName}}",
+        htmlContent: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Order Alert</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+    .content { padding: 20px; }
+    .order-details { background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107; }
+    .customer-details { background-color: #d1ecf1; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #0dcaf0; }
+    .footer { text-align: center; padding: 20px; color: #666; border-top: 1px solid #eee; }
+    .btn { display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 5px; }
+    .alert-icon { font-size: 48px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="alert-icon">🚨</div>
+      <h1>New Order Alert!</h1>
+      <p>A new order has been placed on {{appName}}</p>
+    </div>
+    <div class="content">
+      <p><strong>Action Required:</strong> A new order has been received and requires processing.</p>
+      
+      <div class="order-details">
+        <h3>📋 Order Details:</h3>
+        <p><strong>Order ID:</strong> {{orderId}}</p>
+        <p><strong>Product:</strong> {{productName}}</p>
+        <p><strong>Quantity:</strong> {{quantity}}</p>
+        <p><strong>Total Amount:</strong> {{currency}} {{totalAmount}}</p>
+        <p><strong>Payment Method:</strong> {{paymentMethod}}</p>
+        <p><strong>Order Date:</strong> {{orderDate}}</p>
+      </div>
+
+      <div class="customer-details">
+        <h3>👤 Customer Information:</h3>
+        <p><strong>Name:</strong> {{customerName}}</p>
+        <p><strong>Email:</strong> {{customerEmail}}</p>
+        <p><strong>Player ID:</strong> {{playerID}}</p>
+        {{#if username}}<p><strong>Username:</strong> {{username}}</p>{{/if}}
+      </div>
+      
+      <p>Please process this order promptly to ensure customer satisfaction.</p>
+      
+      <a href="{{websiteUrl}}/admin/orders" class="btn">View in Admin Panel</a>
+    </div>
+    <div class="footer">
+      <p>{{appName}} Admin Notification System</p>
+      <p>This is an automated notification for admins only</p>
+    </div>
+  </div>
+</body>
+</html>`,
+        textContent: `🚨 NEW ORDER ALERT - {{orderId}}
+
+A new order has been placed on {{appName}} and requires processing.
+
+📋 ORDER DETAILS:
+- Order ID: {{orderId}}
+- Product: {{productName}}
+- Quantity: {{quantity}}
+- Total Amount: {{currency}} {{totalAmount}}
+- Payment Method: {{paymentMethod}}
+- Order Date: {{orderDate}}
+
+👤 CUSTOMER INFORMATION:
+- Name: {{customerName}}
+- Email: {{customerEmail}}
+- Player ID: {{playerID}}
+{{#if username}}- Username: {{username}}{{/if}}
+
+ACTION REQUIRED: Please process this order promptly to ensure customer satisfaction.
+
+View in Admin Panel: {{websiteUrl}}/admin/orders
+
+---
+{{appName}} Admin Notification System
+This is an automated notification for admins only`,
+        availableVariables: [
+          "orderId",
+          "customerName",
+          "customerEmail",
+          "productName",
+          "quantity",
+          "totalAmount",
+          "currency",
+          "playerID",
+          "username",
+          "paymentMethod",
+          "orderDate",
+          "appName",
+          "websiteUrl",
+          "currentYear",
+        ],
+      },
+      {
+        type: "admin_order_status_update",
+        subject: "📋 Order Status Update - {{orderId}} | {{appName}}",
+        htmlContent: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Status Update</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #6f42c1 0%, #5a2d91 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+    .content { padding: 20px; }
+    .status-update { background-color: #e7f3ff; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #007bff; }
+    .order-info { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    .footer { text-align: center; padding: 20px; color: #666; border-top: 1px solid #eee; }
+    .btn { display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 5px; }
+    .update-icon { font-size: 48px; margin-bottom: 10px; }
+    .status-badge { background-color: #28a745; color: white; padding: 5px 10px; border-radius: 20px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="update-icon">📋</div>
+      <h1>Order Status Updated</h1>
+      <p>Order {{orderId}} status has been changed</p>
+    </div>
+    <div class="content">
+      <div class="status-update">
+        <h3>📊 Status Change:</h3>
+        <p><strong>Order ID:</strong> {{orderId}}</p>
+        <p><strong>Previous Status:</strong> <span style="color: #6c757d;">{{oldStatus}}</span></p>
+        <p><strong>New Status:</strong> <span class="status-badge">{{newStatus}}</span></p>
+        <p><strong>Update Date:</strong> {{updateDate}}</p>
+      </div>
+
+      <div class="order-info">
+        <h3>📋 Order Information:</h3>
+        <p><strong>Customer:</strong> {{customerName}} ({{customerEmail}})</p>
+        <p><strong>Product:</strong> {{productName}}</p>
+        <p><strong>Amount:</strong> {{currency}} {{totalAmount}}</p>
+        <p><strong>Player ID:</strong> {{playerID}}</p>
+        {{#if username}}<p><strong>Username:</strong> {{username}}</p>{{/if}}
+      </div>
+      
+      <a href="{{websiteUrl}}/admin/orders" class="btn">View All Orders</a>
+    </div>
+    <div class="footer">
+      <p>{{appName}} Admin Notification System</p>
+      <p>This status update notification was sent automatically</p>
+    </div>
+  </div>
+</body>
+</html>`,
+        textContent: `📋 ORDER STATUS UPDATE - {{orderId}}
+
+Order {{orderId}} status has been updated on {{appName}}.
+
+📊 STATUS CHANGE:
+- Order ID: {{orderId}}
+- Previous Status: {{oldStatus}}
+- New Status: {{newStatus}}
+- Update Date: {{updateDate}}
+
+📋 ORDER INFORMATION:
+- Customer: {{customerName}} ({{customerEmail}})
+- Product: {{productName}}
+- Amount: {{currency}} {{totalAmount}}
+- Player ID: {{playerID}}
+{{#if username}}- Username: {{username}}{{/if}}
+
+View All Orders: {{websiteUrl}}/admin/orders
+
+---
+{{appName}} Admin Notification System
+This status update notification was sent automatically`,
+        availableVariables: [
+          "orderId",
+          "customerName",
+          "customerEmail",
+          "productName",
+          "oldStatus",
+          "newStatus",
+          "totalAmount",
+          "currency",
+          "playerID",
+          "username",
+          "updateDate",
+          "appName",
+          "websiteUrl",
+          "currentYear",
+        ],
+      },
     ];
 
     // Create templates if they don't exist

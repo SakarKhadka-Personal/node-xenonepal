@@ -11,6 +11,8 @@ const emailTemplateSchema = new mongoose.Schema(
         "user_registration",
         "welcome",
         "test_email",
+        "admin_new_order",
+        "admin_order_status_update",
       ],
       unique: true,
     },
