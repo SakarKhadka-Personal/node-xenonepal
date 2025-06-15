@@ -69,6 +69,195 @@ const settingSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "https://discord.gg/xenonepal",
+    }, // Email Configuration
+    emailSettings: {
+      emailUser: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+      emailPassword: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+      emailFromName: {
+        type: String,
+        trim: true,
+        default: "XenoNepal",
+      },
+      supportEmail: {
+        type: String,
+        trim: true,
+        default: "support@xenonepal.com",
+      },
+      enableEmailNotifications: {
+        type: Boolean,
+        default: true,
+      },
+    },
+    // Analytics & Tracking
+    facebookPixelId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    googleAnalyticsId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    googleTagManagerId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    hotjarId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    // Domain & API Settings
+    domainSettings: {
+      productionDomain: {
+        type: String,
+        trim: true,
+        default: "xenonepal.com",
+      },
+      apiBaseUrl: {
+        type: String,
+        trim: true,
+        default: "https://xenonepal.com/api",
+      },
+      cdnUrl: {
+        type: String,
+        trim: true,
+        default: "https://cdn.xenonepal.com",
+      },
+      enableHttps: {
+        type: Boolean,
+        default: true,
+      },
+    },
+    // Payment Gateway Settings
+    paymentSettings: {
+      esewa: {
+        merchantId: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        secretKey: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        enabled: {
+          type: Boolean,
+          default: false,
+        },
+      },
+      khalti: {
+        publicKey: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        secretKey: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        enabled: {
+          type: Boolean,
+          default: false,
+        },
+      },
+      paypal: {
+        clientId: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        clientSecret: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        enabled: {
+          type: Boolean,
+          default: false,
+        },
+      },
+    },
+    // Third Party Integrations
+    integrations: {
+      recaptcha: {
+        siteKey: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        secretKey: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        enabled: {
+          type: Boolean,
+          default: false,
+        },
+      },
+      whatsapp: {
+        phoneNumber: {
+          type: String,
+          trim: true,
+          default: "+977-9876543210",
+        },
+        enabled: {
+          type: Boolean,
+          default: true,
+        },
+      },
+      telegram: {
+        botToken: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        chatId: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        enabled: {
+          type: Boolean,
+          default: false,
+        },
+      },
+    },
+    // Site Configuration
+    siteConfig: {
+      maintenanceMode: {
+        type: Boolean,
+        default: false,
+      },
+      allowRegistration: {
+        type: Boolean,
+        default: true,
+      },
+      requireEmailVerification: {
+        type: Boolean,
+        default: true,
+      },
+      maxOrdersPerDay: {
+        type: Number,
+        default: 50,
+      },
+      autoApproveOrders: {
+        type: Boolean,
+        default: false,
+      },
     },
   },
   {

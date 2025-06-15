@@ -1,5 +1,6 @@
 const Order = require("./order.model");
 const User = require("../user/user.model");
+const emailService = require("../email/emailService");
 
 // Create a new order
 exports.createOrder = async (req, res) => {
@@ -11,6 +12,28 @@ exports.createOrder = async (req, res) => {
       paymentMethod,
       paymentScreenshot,
     });
+
+    // Send order confirmation email
+    try {
+      const user = await User.findOne({ googleId: userId });
+      if (user && user.email) {
+        await emailService.sendOrderCompletionEmail(user.email, {
+          userName: user.name,
+          orderId: newOrder._id.toString().slice(-8),
+          productName: order.title || "Gaming Product",
+          quantity: order.quantity || 1,
+          totalAmount: order.price || order.totalAmount,
+          currency: order.currency || "NPR",
+          playerID: order.playerID,
+          username: order.username,
+          createdAt: newOrder.createdAt,
+        });
+      }
+    } catch (emailError) {
+      console.error("Failed to send order confirmation email:", emailError);
+      // Don't fail the order creation if email fails
+    }
+
     res
       .status(201)
       .json({ message: "Order created successfully", order: newOrder });
@@ -127,6 +150,33 @@ exports.updateOrderStatus = async (req, res) => {
 
     if (!updatedOrder)
       return res.status(404).json({ error: "Order not found" });
+
+    // Send email notification for delivered orders
+    if (status.toLowerCase() === "delivered") {
+      try {
+        const user = await User.findOne({ googleId: updatedOrder.userId });
+        if (user && user.email) {
+          await emailService.sendOrderDeliveredEmail(user.email, {
+            userName: user.name,
+            orderId: updatedOrder._id.toString().slice(-8),
+            productName: updatedOrder.order.title || "Gaming Product",
+            quantity: updatedOrder.order.quantity || 1,
+            totalAmount:
+              updatedOrder.order.price || updatedOrder.order.totalAmount,
+            currency: updatedOrder.order.currency || "NPR",
+            playerID: updatedOrder.order.playerID,
+            username: updatedOrder.order.username,
+          });
+        }
+      } catch (emailError) {
+        console.error(
+          "Failed to send delivery confirmation email:",
+          emailError
+        );
+        // Don't fail the status update if email fails
+      }
+    }
+
     res.json({
       message: "Order status updated successfully",
       order: updatedOrder,

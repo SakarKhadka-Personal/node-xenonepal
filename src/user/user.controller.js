@@ -1,5 +1,6 @@
 const User = require("./user.model");
 const Order = require("../order/order.model");
+const emailService = require("../email/emailService");
 
 // Get All Users
 const getAllUsers = async (req, res) => {
@@ -252,6 +253,17 @@ const syncUser = async (req, res) => {
           message: "Error creating new user",
           error: createErr.message,
         });
+      }
+
+      // Send welcome email for new users
+      try {
+        await emailService.sendWelcomeEmail(user.email, {
+          name: user.name,
+          email: user.email,
+        });
+      } catch (emailError) {
+        console.error("Failed to send welcome email:", emailError);
+        // Don't fail user creation if email fails
       }
     }
 

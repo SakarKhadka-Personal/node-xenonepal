@@ -23,8 +23,10 @@
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^4.19.2",
+    "handlebars": "^4.7.8",
     "helmet": "^8.1.0",
     "mongoose": "^8.15.1",
+    "nodemailer": "^7.0.3",
     "nodemon": "^3.1.10",
     "pm2": "^6.0.8"
   }
