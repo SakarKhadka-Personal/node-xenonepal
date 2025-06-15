@@ -47,10 +47,8 @@ class EmailService {
       if (!emailSettings.enableEmailNotifications) {
         console.log("Email notifications are disabled");
         return;
-      }
-
-      // Using Gmail SMTP (free service)
-      this.transporter = nodemailer.createTransporter({
+      } // Using Gmail SMTP (free service)
+      this.transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
           user: emailSettings.emailUser,

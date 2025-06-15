@@ -1,8 +1,5 @@
 const Setting = require("./setting.model");
-const EmailService = require("../email/emailService");
-
-// Create email service instance
-const emailService = new EmailService();
+const emailService = require("../email/emailService");
 
 // Post a Settings
 const postSettings = async (req, res) => {
