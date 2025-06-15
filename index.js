@@ -53,6 +53,10 @@ app.use("/api/orders", orderRoute);
 const settingsRoute = require("./src/settings/setting.route");
 app.use("/api/settings", settingsRoute);
 
+// SEO Routes
+const seoRoute = require("./src/seo/seo.route");
+app.use("/api/seo", seoRoute);
+
 //Root Route For Checking Server Status
 app.get("/", function (req, res) {
   res.send("Server Is Running Perfectly");
