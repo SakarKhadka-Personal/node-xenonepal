@@ -162,16 +162,12 @@ exports.getAllOrders = async (req, res) => {
     }
 
     // Get total count for pagination (without search filtering for user info)
-    const total = await Order.countDocuments(filter);
-
-    // Get status counts for all orders (not just filtered ones)
-    const [totalDelivered, totalPending, totalProcessing, totalCancelled] =
-      await Promise.all([
-        Order.countDocuments({ status: "delivered" }),
-        Order.countDocuments({ status: "pending" }),
-        Order.countDocuments({ status: "processing" }),
-        Order.countDocuments({ status: "cancelled" }),
-      ]);
+    const total = await Order.countDocuments(filter); // Get status counts for all orders (not just filtered ones)
+    const [totalDelivered, totalPending, totalCancelled] = await Promise.all([
+      Order.countDocuments({ status: "delivered" }),
+      Order.countDocuments({ status: "pending" }),
+      Order.countDocuments({ status: "cancelled" }),
+    ]);
 
     res.json({
       orders: finalOrdersWithUserInfo,
@@ -181,7 +177,6 @@ exports.getAllOrders = async (req, res) => {
       statusCounts: {
         delivered: totalDelivered,
         pending: totalPending,
-        processing: totalProcessing,
         cancelled: totalCancelled,
       },
     });
@@ -207,84 +202,71 @@ exports.updateOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const validStatuses = [
-      "pending",
-      "processing",
-      "confirmed",
-      "shipped",
-      "delivered",
-      "cancelled",
-    ];
+    const validStatuses = ["pending", "delivered", "cancelled"];
     if (!validStatuses.includes(status.toLowerCase())) {
       return res.status(400).json({ error: "Invalid status value" });
-    } // Get the original order to track status change
-    const originalOrder = await Order.findById(id);
-    if (!originalOrder)
-      return res.status(404).json({ error: "Order not found" });
+    }
 
-    const oldStatus = originalOrder.status;
-
+    // Update the order status
     const updatedOrder = await Order.findByIdAndUpdate(
       id,
       { status: status.toLowerCase() },
       { new: true }
     );
 
-    // Send email notifications
-    try {
-      const user = await User.findOne({ googleId: updatedOrder.userId });
-      if (user && user.email) {
-        // Send customer delivery notification for delivered orders
-        if (status.toLowerCase() === "delivered") {
-          await emailService.sendOrderDeliveredEmail(user.email, {
-            userName: user.name,
-            orderId: updatedOrder._id.toString().slice(-8),
-            productName: updatedOrder.order.title || "Gaming Product",
-            quantity: updatedOrder.order.quantity || 1,
-            totalAmount:
-              updatedOrder.order.price || updatedOrder.order.totalAmount,
-            currency: updatedOrder.order.currency || "NPR",
-            paymentMethod: updatedOrder.paymentMethod || "Not specified",
-            playerID: updatedOrder.order.playerID,
-            username: updatedOrder.order.username,
-          });
-        }
-
-        // Send admin notification for status update (optimized - runs in background)
-        setImmediate(() => {
-          emailService
-            .sendAdminOrderStatusUpdate(
-              {
-                orderId: updatedOrder._id.toString().slice(-8),
-                customerName: user.name,
-                customerEmail: user.email,
-                productName: updatedOrder.order.title || "Gaming Product",
-                totalAmount:
-                  updatedOrder.order.price || updatedOrder.order.totalAmount,
-                currency: updatedOrder.order.currency || "NPR",
-                paymentMethod: updatedOrder.paymentMethod || "Not specified",
-                playerID: updatedOrder.order.playerID,
-                username: updatedOrder.order.username,
-              },
-              oldStatus,
-              status.toLowerCase()
-            )
-            .catch((error) => {
-              console.error(
-                "Failed to send admin status update notification:",
-                error
-              );
-            });
-        });
-      }
-    } catch (emailError) {
-      console.error("Failed to send email notifications:", emailError);
-      // Don't fail the status update if email fails
+    if (!updatedOrder) {
+      return res.status(404).json({ error: "Order not found" });
     }
 
+    // Send response immediately for better performance
     res.json({
       message: "Order status updated successfully",
       order: updatedOrder,
+    });
+
+    // Send email notifications asynchronously (non-blocking)
+    setImmediate(async () => {
+      try {
+        const user = await User.findOne({ googleId: updatedOrder.userId });
+        if (user && user.email) {
+          // Send customer delivery notification for delivered orders
+          if (status.toLowerCase() === "delivered") {
+            await emailService.sendOrderDeliveredEmail(user.email, {
+              userName: user.name,
+              orderId: updatedOrder._id.toString().slice(-8),
+              productName: updatedOrder.order.title || "Gaming Product",
+              quantity: updatedOrder.order.quantity || 1,
+              totalAmount:
+                updatedOrder.order.price || updatedOrder.order.totalAmount,
+              currency: updatedOrder.order.currency || "NPR",
+              paymentMethod: updatedOrder.paymentMethod || "Not specified",
+              playerID: updatedOrder.order.playerID,
+              username: updatedOrder.order.username,
+            });
+          }
+
+          // Send admin notification for status update
+          await emailService.sendAdminOrderStatusUpdate(
+            {
+              orderId: updatedOrder._id.toString().slice(-8),
+              customerName: user.name,
+              customerEmail: user.email,
+              productName: updatedOrder.order.title || "Gaming Product",
+              totalAmount:
+                updatedOrder.order.price || updatedOrder.order.totalAmount,
+              currency: updatedOrder.order.currency || "NPR",
+              paymentMethod: updatedOrder.paymentMethod || "Not specified",
+              playerID: updatedOrder.order.playerID,
+              username: updatedOrder.order.username,
+            },
+            "previous_status",
+            status.toLowerCase()
+          );
+        }
+      } catch (emailError) {
+        console.error("Failed to send email notifications:", emailError);
+        // Email failure doesn't affect the status update
+      }
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
