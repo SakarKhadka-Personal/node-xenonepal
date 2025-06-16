@@ -101,6 +101,62 @@ const deleteTemplate = async (req, res) => {
   }
 };
 
+// Get template variables with detailed documentation
+const getTemplateVariables = async (req, res) => {
+  try {
+    const { type } = req.params;
+
+    if (!type) {
+      return res.status(400).json({ message: "Template type is required" });
+    }
+
+    const template = await EmailTemplate.findOne({ type, isActive: true });
+
+    if (!template) {
+      return res.status(404).json({ message: "Template not found" });
+    }
+
+    // Return detailed variable information
+    const response = {
+      templateType: template.type,
+      availableVariables: template.availableVariables,
+      variableDocumentation: template.variableDocumentation,
+      lastUpdated: template.updatedAt,
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error("Error fetching template variables:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Get all template types with their variable counts
+const getTemplateVariablesSummary = async (req, res) => {
+  try {
+    const templates = await EmailTemplate.find(
+      {},
+      "type availableVariables variableDocumentation isActive updatedAt"
+    );
+
+    const summary = templates.map((template) => ({
+      type: template.type,
+      isActive: template.isActive,
+      variableCount: template.availableVariables.length,
+      hasDocumentation: !!template.variableDocumentation,
+      categories: template.variableDocumentation?.categories
+        ? Object.keys(template.variableDocumentation.categories)
+        : [],
+      lastUpdated: template.updatedAt,
+    }));
+
+    res.status(200).json(summary);
+  } catch (error) {
+    console.error("Error fetching template variables summary:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 // Initialize default templates
 const initializeDefaultTemplates = async (req, res) => {
   try {
@@ -134,16 +190,23 @@ const initializeDefaultTemplates = async (req, res) => {
     <div class="content">
       <p>Dear {{userName}},</p>
       <p>Your order has been successfully confirmed and is being processed. Here are your order details:</p>
-      
-      <div class="order-details">
+        <div class="order-details">
         <h3>Order Details:</h3>
         <p><strong>Order ID:</strong> {{orderId}}</p>
         <p><strong>Product:</strong> {{productName}}</p>
         <p><strong>Quantity:</strong> {{quantity}}</p>
-        <p><strong>Total Amount:</strong> {{currency}} {{totalAmount}}</p>
+        <p><strong>Total Amount:</strong> {{currency}} {{amount}}</p>
+        <p><strong>Payment Method:</strong> {{paymentMethod}}</p>
         <p><strong>Player ID:</strong> {{playerID}}</p>
         {{#if username}}<p><strong>Username:</strong> {{username}}</p>{{/if}}
         <p><strong>Order Date:</strong> {{orderDate}}</p>
+      </div>
+      
+      <div class="order-details" style="background-color: #e8f5e8; border-left: 4px solid #28a745;">
+        <h3>Billing Information:</h3>
+        <p><strong>Name:</strong> {{billingName}}</p>
+        <p><strong>Email:</strong> {{billingEmail}}</p>
+        <p><strong>Phone:</strong> {{billingPhone}}</p>
       </div>
       
       <p>Your order is now in queue for processing. You will receive another email once your order has been delivered.</p>
@@ -168,10 +231,16 @@ Order Details:
 - Order ID: {{orderId}}
 - Product: {{productName}}
 - Quantity: {{quantity}}
-- Total Amount: {{currency}} {{totalAmount}}
+- Total Amount: {{currency}} {{amount}}
+- Payment Method: {{paymentMethod}}
 - Player ID: {{playerID}}
 {{#if username}}- Username: {{username}}{{/if}}
 - Order Date: {{orderDate}}
+
+Billing Information:
+- Name: {{billingName}}
+- Email: {{billingEmail}}
+- Phone: {{billingPhone}}
 
 Your order is now in queue for processing. You will receive another email once your order has been delivered.
 
@@ -187,8 +256,13 @@ If you have any questions, please contact us at {{supportEmail}}
           "orderId",
           "productName",
           "quantity",
+          "amount",
           "totalAmount",
           "currency",
+          "paymentMethod",
+          "billingName",
+          "billingEmail",
+          "billingPhone",
           "playerID",
           "username",
           "orderDate",
@@ -229,16 +303,23 @@ If you have any questions, please contact us at {{supportEmail}}
     <div class="content">
       <p>Dear {{userName}},</p>
       <p>Great news! Your order has been successfully delivered. Your gaming credits/subscription has been added to your account.</p>
-      
-      <div class="order-details">
+        <div class="order-details">
         <h3>Delivered Order Details:</h3>
         <p><strong>Order ID:</strong> {{orderId}}</p>
         <p><strong>Product:</strong> {{productName}}</p>
         <p><strong>Quantity:</strong> {{quantity}}</p>
-        <p><strong>Total Amount:</strong> {{currency}} {{totalAmount}}</p>
+        <p><strong>Total Amount:</strong> {{currency}} {{amount}}</p>
+        <p><strong>Payment Method:</strong> {{paymentMethod}}</p>
         <p><strong>Player ID:</strong> {{playerID}}</p>
         {{#if username}}<p><strong>Username:</strong> {{username}}</p>{{/if}}
         <p><strong>Delivered On:</strong> {{deliveryDate}}</p>
+      </div>
+      
+      <div class="order-details" style="background-color: #e8f5e8; border-left: 4px solid #28a745;">
+        <h3>Billing Information:</h3>
+        <p><strong>Name:</strong> {{billingName}}</p>
+        <p><strong>Email:</strong> {{billingEmail}}</p>
+        <p><strong>Phone:</strong> {{billingPhone}}</p>
       </div>
       
       <p>Please check your game account to confirm the credits have been added. If you don't see the credits within 5-10 minutes, please contact our support team.</p>
@@ -264,10 +345,16 @@ Delivered Order Details:
 - Order ID: {{orderId}}
 - Product: {{productName}}
 - Quantity: {{quantity}}
-- Total Amount: {{currency}} {{totalAmount}}
+- Total Amount: {{currency}} {{amount}}
+- Payment Method: {{paymentMethod}}
 - Player ID: {{playerID}}
 {{#if username}}- Username: {{username}}{{/if}}
 - Delivered On: {{deliveryDate}}
+
+Billing Information:
+- Name: {{billingName}}
+- Email: {{billingEmail}}
+- Phone: {{billingPhone}}
 
 Please check your game account to confirm the credits have been added. If you don't see the credits within 5-10 minutes, please contact our support team.
 
@@ -283,8 +370,13 @@ If you have any questions, please contact us at {{supportEmail}}
           "orderId",
           "productName",
           "quantity",
+          "amount",
           "totalAmount",
           "currency",
+          "paymentMethod",
+          "billingName",
+          "billingEmail",
+          "billingPhone",
           "playerID",
           "username",
           "deliveryDate",
@@ -433,13 +525,12 @@ Need help? Contact us at {{supportEmail}}
     </div>
     <div class="content">
       <p><strong>Action Required:</strong> A new order has been received and requires processing.</p>
-      
-      <div class="order-details">
+        <div class="order-details">
         <h3>📋 Order Details:</h3>
         <p><strong>Order ID:</strong> {{orderId}}</p>
         <p><strong>Product:</strong> {{productName}}</p>
         <p><strong>Quantity:</strong> {{quantity}}</p>
-        <p><strong>Total Amount:</strong> {{currency}} {{totalAmount}}</p>
+        <p><strong>Total Amount:</strong> {{currency}} {{amount}}</p>
         <p><strong>Payment Method:</strong> {{paymentMethod}}</p>
         <p><strong>Order Date:</strong> {{orderDate}}</p>
       </div>
@@ -450,6 +541,13 @@ Need help? Contact us at {{supportEmail}}
         <p><strong>Email:</strong> {{customerEmail}}</p>
         <p><strong>Player ID:</strong> {{playerID}}</p>
         {{#if username}}<p><strong>Username:</strong> {{username}}</p>{{/if}}
+      </div>
+      
+      <div class="customer-details" style="background-color: #e8f5e8; border-left: 4px solid #28a745;">
+        <h3>💳 Billing Information:</h3>
+        <p><strong>Billing Name:</strong> {{billingName}}</p>
+        <p><strong>Billing Email:</strong> {{billingEmail}}</p>
+        <p><strong>Billing Phone:</strong> {{billingPhone}}</p>
       </div>
       
       <p>Please process this order promptly to ensure customer satisfaction.</p>
@@ -471,7 +569,7 @@ A new order has been placed on {{appName}} and requires processing.
 - Order ID: {{orderId}}
 - Product: {{productName}}
 - Quantity: {{quantity}}
-- Total Amount: {{currency}} {{totalAmount}}
+- Total Amount: {{currency}} {{amount}}
 - Payment Method: {{paymentMethod}}
 - Order Date: {{orderDate}}
 
@@ -480,6 +578,11 @@ A new order has been placed on {{appName}} and requires processing.
 - Email: {{customerEmail}}
 - Player ID: {{playerID}}
 {{#if username}}- Username: {{username}}{{/if}}
+
+💳 BILLING INFORMATION:
+- Billing Name: {{billingName}}
+- Billing Email: {{billingEmail}}
+- Billing Phone: {{billingPhone}}
 
 ACTION REQUIRED: Please process this order promptly to ensure customer satisfaction.
 
@@ -494,11 +597,15 @@ This is an automated notification for admins only`,
           "customerEmail",
           "productName",
           "quantity",
+          "amount",
           "totalAmount",
           "currency",
+          "paymentMethod",
+          "billingName",
+          "billingEmail",
+          "billingPhone",
           "playerID",
           "username",
-          "paymentMethod",
           "orderDate",
           "appName",
           "websiteUrl",
@@ -542,15 +649,21 @@ This is an automated notification for admins only`,
         <p><strong>Previous Status:</strong> <span style="color: #6c757d;">{{oldStatus}}</span></p>
         <p><strong>New Status:</strong> <span class="status-badge">{{newStatus}}</span></p>
         <p><strong>Update Date:</strong> {{updateDate}}</p>
-      </div>
-
-      <div class="order-info">
+      </div>      <div class="order-info">
         <h3>📋 Order Information:</h3>
         <p><strong>Customer:</strong> {{customerName}} ({{customerEmail}})</p>
         <p><strong>Product:</strong> {{productName}}</p>
-        <p><strong>Amount:</strong> {{currency}} {{totalAmount}}</p>
+        <p><strong>Amount:</strong> {{currency}} {{amount}}</p>
+        <p><strong>Payment Method:</strong> {{paymentMethod}}</p>
         <p><strong>Player ID:</strong> {{playerID}}</p>
         {{#if username}}<p><strong>Username:</strong> {{username}}</p>{{/if}}
+      </div>
+      
+      <div class="order-info" style="background-color: #e8f5e8; border-left: 4px solid #28a745;">
+        <h3>💳 Billing Information:</h3>
+        <p><strong>Billing Name:</strong> {{billingName}}</p>
+        <p><strong>Billing Email:</strong> {{billingEmail}}</p>
+        <p><strong>Billing Phone:</strong> {{billingPhone}}</p>
       </div>
       
       <a href="{{websiteUrl}}/admin/orders" class="btn">View All Orders</a>
@@ -575,9 +688,15 @@ Order {{orderId}} status has been updated on {{appName}}.
 📋 ORDER INFORMATION:
 - Customer: {{customerName}} ({{customerEmail}})
 - Product: {{productName}}
-- Amount: {{currency}} {{totalAmount}}
+- Amount: {{currency}} {{amount}}
+- Payment Method: {{paymentMethod}}
 - Player ID: {{playerID}}
 {{#if username}}- Username: {{username}}{{/if}}
+
+💳 BILLING INFORMATION:
+- Billing Name: {{billingName}}
+- Billing Email: {{billingEmail}}
+- Billing Phone: {{billingPhone}}
 
 View All Orders: {{websiteUrl}}/admin/orders
 
@@ -591,12 +710,108 @@ This status update notification was sent automatically`,
           "productName",
           "oldStatus",
           "newStatus",
+          "amount",
           "totalAmount",
           "currency",
+          "paymentMethod",
+          "billingName",
+          "billingEmail",
+          "billingPhone",
           "playerID",
           "username",
           "updateDate",
           "appName",
+          "websiteUrl",
+          "currentYear",
+        ],
+      },
+      {
+        type: "test_email",
+        subject: "Test Email - {{appName}} Configuration Check",
+        htmlContent: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Email</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #007bff 0%, #6610f2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+    .content { padding: 20px; }
+    .test-details { background-color: #e7f3ff; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #007bff; }
+    .footer { text-align: center; padding: 20px; color: #666; border-top: 1px solid #eee; }
+    .success-badge { background-color: #28a745; color: white; padding: 5px 10px; border-radius: 15px; font-size: 12px; }
+    .feature-list { list-style: none; padding: 0; }
+    .feature-list li { padding: 8px 0; border-bottom: 1px solid #eee; }
+    .feature-list li:before { content: "✅ "; color: #28a745; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🧪 Email System Test</h1>
+      <p>{{appName}} Email Configuration Check</p>
+      <span class="success-badge">HTML ENABLED</span>
+    </div>
+    <div class="content">
+      <h2>Email Service Status: <span style="color: #28a745;">✅ Working</span></h2>
+      <p>Congratulations! Your email service is properly configured and can send HTML emails.</p>
+      
+      <div class="test-details">
+        <h3>📧 Test Details:</h3>
+        <ul class="feature-list">
+          <li><strong>HTML Rendering:</strong> Successful</li>
+          <li><strong>CSS Styling:</strong> Applied</li>
+          <li><strong>Template Variables:</strong> {{testMessage}}</li>
+          <li><strong>Email Service:</strong> Operational</li>
+          <li><strong>SMTP Configuration:</strong> Valid</li>
+        </ul>
+      </div>
+      
+      <h3>🎨 Visual Elements Test:</h3>
+      <p>If you can see this content with proper formatting, colors, and styling, then your HTML email templates are working correctly!</p>
+      
+      <p style="color: #007bff; font-size: 18px; text-align: center; background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
+        <strong>HTML Email Support: CONFIRMED ✅</strong>
+      </p>
+      
+      <p><strong>Test sent:</strong> {{currentYear}}<br>
+      <strong>From:</strong> {{appName}} Email System<br>
+      <strong>Support:</strong> {{supportEmail}}</p>
+    </div>
+    <div class="footer">
+      <p>This test email confirms your {{appName}} email system is working properly.</p>
+      <p>You can now customize your email templates with confidence!</p>
+      <p>&copy; {{currentYear}} {{appName}}. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>`,
+        textContent: `Email System Test - {{appName}}
+
+Email Service Status: ✅ Working
+
+Congratulations! Your email service is properly configured.
+
+Test Details:
+- HTML Rendering: If you see this plain text, HTML might not be supported by your email client
+- Template Variables: {{testMessage}}
+- Email Service: Operational
+- SMTP Configuration: Valid
+
+Test sent: {{currentYear}}
+From: {{appName}} Email System
+Support: {{supportEmail}}
+
+This test email confirms your {{appName}} email system is working properly.
+
+© {{currentYear}} {{appName}}. All rights reserved.`,
+        availableVariables: [
+          "testMessage",
+          "appName",
+          "supportEmail",
           "websiteUrl",
           "currentYear",
         ],
@@ -629,4 +844,6 @@ module.exports = {
   updateTemplate,
   deleteTemplate,
   initializeDefaultTemplates,
+  getTemplateVariables,
+  getTemplateVariablesSummary,
 };

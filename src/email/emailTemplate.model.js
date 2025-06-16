@@ -32,11 +32,19 @@ const emailTemplateSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
-    },
-    // Available variables for templating
+    }, // Available variables for templating
     availableVariables: {
       type: [String],
       default: [],
+    },
+    // Detailed documentation for variables (for admin interface)
+    variableDocumentation: {
+      type: {
+        description: String,
+        categories: mongoose.Schema.Types.Mixed,
+        totalVariables: Number,
+      },
+      default: null,
     },
   },
   {

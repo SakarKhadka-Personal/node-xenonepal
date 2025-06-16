@@ -23,6 +23,7 @@ exports.createOrder = async (req, res) => {
           quantity: order.quantity || 1,
           totalAmount: order.price || order.totalAmount,
           currency: order.currency || "NPR",
+          paymentMethod: paymentMethod || "Not specified",
           playerID: order.playerID,
           username: order.username,
           createdAt: newOrder.createdAt,
@@ -190,6 +191,7 @@ exports.updateOrderStatus = async (req, res) => {
             totalAmount:
               updatedOrder.order.price || updatedOrder.order.totalAmount,
             currency: updatedOrder.order.currency || "NPR",
+            paymentMethod: updatedOrder.paymentMethod || "Not specified",
             playerID: updatedOrder.order.playerID,
             username: updatedOrder.order.username,
           });
@@ -207,6 +209,7 @@ exports.updateOrderStatus = async (req, res) => {
                 totalAmount:
                   updatedOrder.order.price || updatedOrder.order.totalAmount,
                 currency: updatedOrder.order.currency || "NPR",
+                paymentMethod: updatedOrder.paymentMethod || "Not specified",
                 playerID: updatedOrder.order.playerID,
                 username: updatedOrder.order.username,
               },
