@@ -20,9 +20,7 @@ class EmailService {
       if (settings && settings.emailSettings) {
         this.emailSettings = settings.emailSettings;
         return this.emailSettings;
-      }
-
-      // Fallback to environment variables
+      } // Fallback to environment variables
       const envSettings = {
         emailUser: process.env.EMAIL_USER || "xenonepal@gmail.com",
         emailPassword: process.env.EMAIL_PASSWORD || "kjjphtcoduqslwgt",
@@ -30,16 +28,6 @@ class EmailService {
         supportEmail: process.env.SUPPORT_EMAIL || "support@xenonepal.com",
         enableEmailNotifications: true,
       };
-
-      console.log("Using environment email settings:", {
-        emailUser: envSettings.emailUser,
-        emailFromName: envSettings.emailFromName,
-        supportEmail: envSettings.supportEmail,
-        hasPassword: !!envSettings.emailPassword,
-        passwordLength: envSettings.emailPassword
-          ? envSettings.emailPassword.length
-          : 0,
-      });
 
       return envSettings;
     } catch (error) {
@@ -54,12 +42,8 @@ class EmailService {
       };
     }
   }
-
   async initializeTransporter() {
     try {
-      console.log("=== INITIALIZING EMAIL TRANSPORTER ===");
-      console.log("Environment:", process.env.NODE_ENV);
-
       // Load email settings from database or environment
       const emailSettings = await this.loadEmailSettings();
 
@@ -76,13 +60,12 @@ class EmailService {
           emailUser: emailSettings.emailUser,
         });
         return;
-      }
-
-      console.log("✅ Email credentials validated");
-
-      // Using Gmail SMTP (free service)
-      this.transporter = nodemailer.createTransporter({
+      } // Using Gmail SMTP (free service)
+      this.transporter = nodemailer.createTransport({
         service: "gmail",
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false, // Use TLS
         auth: {
           user: emailSettings.emailUser,
           pass: emailSettings.emailPassword, // Use App Password for Gmail
@@ -90,12 +73,16 @@ class EmailService {
         // Ensure proper HTML support
         tls: {
           rejectUnauthorized: false,
+          ciphers: "SSLv3",
         },
         // Additional options for better email delivery
         pool: true,
         maxConnections: 1,
         rateDelta: 20000,
         rateLimit: 5,
+        // Add timeout to prevent hanging
+        connectionTimeout: 60000, // 60 seconds
+        socketTimeout: 60000, // 60 seconds
         // Ensure proper encoding for HTML emails
         defaults: {
           from: `${emailSettings.emailFromName} <${emailSettings.emailUser}>`,
@@ -106,10 +93,8 @@ class EmailService {
       });
 
       // Verify connection
-      console.log("🔍 Verifying Gmail SMTP connection...");
       await this.transporter.verify();
       console.log("✅ Email service initialized successfully!");
-      console.log("📧 Email user:", emailSettings.emailUser);
 
       // Store settings for later use
       this.emailSettings = emailSettings;
@@ -156,25 +141,16 @@ class EmailService {
       // Check cache first to reduce database queries
       const cacheKey = `template_${type}`;
       const now = Date.now();
-
       if (this.templateCache.has(cacheKey)) {
         const cached = this.templateCache.get(cacheKey);
         if (now - cached.timestamp < this.templateCacheExpiry) {
-          console.log(`Template ${type} found in cache`);
           return cached.template;
         }
         this.templateCache.delete(cacheKey);
       }
 
-      console.log(`Looking for template type: ${type}`);
-      const template = await EmailTemplate.findOne({ type, isActive: true });
-
-      // If template not found, try to auto-initialize it
+      const template = await EmailTemplate.findOne({ type, isActive: true }); // If template not found, try to auto-initialize it
       if (!template) {
-        console.log(
-          `Template ${type} not found, checking if we should auto-create it`
-        );
-
         // Check if it's a known template type that should exist
         const knownTypes = [
           "order_completion",
@@ -187,7 +163,6 @@ class EmailService {
         ];
 
         if (knownTypes.includes(type)) {
-          console.log(`Attempting to create missing template: ${type}`);
           // Try to initialize default templates
           try {
             const {
@@ -201,7 +176,6 @@ class EmailService {
               isActive: true,
             });
             if (newTemplate) {
-              console.log(`Successfully created and found template: ${type}`);
               this.templateCache.set(cacheKey, {
                 template: newTemplate,
                 timestamp: now,
@@ -218,7 +192,6 @@ class EmailService {
 
       // Cache the template for better performance
       if (template) {
-        console.log(`Template ${type} found in database`);
         this.templateCache.set(cacheKey, {
           template,
           timestamp: now,
@@ -234,16 +207,11 @@ class EmailService {
   compileTemplate(templateContent, variables) {
     try {
       if (!templateContent) {
-        console.log("Template content is empty or null");
         return "";
       }
 
-      console.log(
-        `Compiling template with content length: ${templateContent.length}`
-      );
       const template = Handlebars.compile(templateContent);
       const compiled = template(variables);
-      console.log(`Compiled template result length: ${compiled.length}`);
       return compiled;
     } catch (error) {
       console.error("Error compiling template:", error);
@@ -254,8 +222,6 @@ class EmailService {
   }
   async sendEmail({ to, templateType, variables = {} }) {
     try {
-      console.log(`🚀 SENDING EMAIL: ${templateType} to ${to}`);
-
       if (!this.transporter) {
         console.error(
           "❌ Email service not initialized, attempting to reinitialize..."
@@ -287,11 +253,6 @@ class EmailService {
         return false;
       }
 
-      // Log template details for debugging
-      console.log(
-        `✅ Template found: ${templateType}, has HTML: ${!!template.htmlContent}, has Text: ${!!template.textContent}`
-      );
-
       // Add default variables using current settings
       const defaultVariables = {
         appName: "XenoNepal",
@@ -310,23 +271,6 @@ class EmailService {
         defaultVariables
       );
       const subject = this.compileTemplate(template.subject, defaultVariables);
-
-      // Debug logging to see what content is being sent
-      console.log(`\n=== EMAIL DEBUG INFO ===`);
-      console.log(`Template Type: ${templateType}`);
-      console.log(`Subject: ${subject}`);
-      console.log(
-        `HTML Content Length: ${htmlContent ? htmlContent.length : 0}`
-      );
-      console.log(
-        `Text Content Length: ${textContent ? textContent.length : 0}`
-      );
-      console.log(
-        `HTML Content Preview: ${
-          htmlContent ? htmlContent.substring(0, 200) : "No HTML content"
-        }...`
-      );
-      console.log(`=========================\n`);
 
       const mailOptions = {
         from: `${emailSettings.emailFromName} <${emailSettings.emailUser}>`,
@@ -357,14 +301,6 @@ class EmailService {
             : undefined,
       };
 
-      console.log(`📨 Sending email with options:`, {
-        from: mailOptions.from,
-        to: mailOptions.to,
-        subject: mailOptions.subject,
-        hasHtml: !!mailOptions.html,
-        hasText: !!mailOptions.text,
-      });
-
       // Send email with timeout to prevent hanging
       const info = await Promise.race([
         this.transporter.sendMail(mailOptions),
@@ -372,12 +308,7 @@ class EmailService {
           setTimeout(() => reject(new Error("Email send timeout")), 30000)
         ),
       ]);
-      console.log(`✅ EMAIL SENT SUCCESSFULLY to ${to}:`, {
-        messageId: info.messageId,
-        response: info.response,
-        accepted: info.accepted,
-        rejected: info.rejected,
-      });
+      console.log(`✅ Email sent successfully to ${to} (${templateType})`);
       return true;
     } catch (error) {
       console.error(`❌ ERROR SENDING EMAIL to ${to}:`);

@@ -14,6 +14,8 @@
     "deploy": "node deploy-production.js",
     "deploy-old": "npm run stop; npm run delete; npm run prod",
     "test-email": "node test-email.js",
+    "fix-email": "node fix-email.js",
+    "check-gmail": "node check-gmail-password.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

@@ -21,17 +21,10 @@ async function testEmailConfiguration() {
 
   console.log("📧 Email Configuration:");
   console.log(`  User: ${emailSettings.emailUser}`);
-  console.log(`  From Name: ${emailSettings.emailFromName}`);
-  console.log(`  Support Email: ${emailSettings.supportEmail}`);
   console.log(
     `  Password: ${
       emailSettings.emailPassword ? "***provided***" : "***missing***"
     }`
-  );
-  console.log(
-    `  Password Length: ${
-      emailSettings.emailPassword ? emailSettings.emailPassword.length : 0
-    } chars`
   );
 
   if (
@@ -41,27 +34,28 @@ async function testEmailConfiguration() {
     console.log("⚠️  Gmail App Passwords are typically 16 characters long");
   }
 
-  console.log("\n🔧 Creating Email Transporter...");
-
   try {
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       service: "gmail",
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false, // Use TLS
       auth: {
         user: emailSettings.emailUser,
         pass: emailSettings.emailPassword,
       },
       tls: {
         rejectUnauthorized: false,
+        ciphers: "SSLv3",
       },
       pool: true,
       maxConnections: 1,
       rateDelta: 20000,
       rateLimit: 5,
+      connectionTimeout: 60000,
+      socketTimeout: 60000,
     });
 
-    console.log("✅ Transporter created successfully");
-
-    console.log("\n🔍 Verifying SMTP Connection...");
     await transporter.verify();
     console.log("✅ SMTP Connection verified successfully!");
 
@@ -109,15 +103,10 @@ async function testEmailConfiguration() {
         If you received this email, your email configuration is working correctly! 🎉
       `,
     };
-
     const info = await transporter.sendMail(mailOptions);
 
     console.log("✅ Test email sent successfully!");
-    console.log("📋 Email Details:");
-    console.log(`  Message ID: ${info.messageId}`);
-    console.log(`  Response: ${info.response}`);
-    console.log(`  Accepted: ${info.accepted}`);
-    console.log(`  Rejected: ${info.rejected}`);
+    console.log(`Message ID: ${info.messageId}`);
 
     console.log("\n🎉 Email configuration test completed successfully!");
   } catch (error) {
