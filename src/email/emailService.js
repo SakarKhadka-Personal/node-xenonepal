@@ -23,19 +23,31 @@ class EmailService {
       }
 
       // Fallback to environment variables
-      return {
+      const envSettings = {
         emailUser: process.env.EMAIL_USER || "xenonepal@gmail.com",
-        emailPassword: process.env.EMAIL_PASSWORD || "Subhamsha@2053",
+        emailPassword: process.env.EMAIL_PASSWORD || "kjjphtcoduqslwgt",
         emailFromName: process.env.EMAIL_FROM_NAME || "XenoNepal",
         supportEmail: process.env.SUPPORT_EMAIL || "support@xenonepal.com",
         enableEmailNotifications: true,
       };
+
+      console.log("Using environment email settings:", {
+        emailUser: envSettings.emailUser,
+        emailFromName: envSettings.emailFromName,
+        supportEmail: envSettings.supportEmail,
+        hasPassword: !!envSettings.emailPassword,
+        passwordLength: envSettings.emailPassword
+          ? envSettings.emailPassword.length
+          : 0,
+      });
+
+      return envSettings;
     } catch (error) {
       console.error("Error loading email settings:", error);
       // Return environment fallback
       return {
         emailUser: process.env.EMAIL_USER || "xenonepal@gmail.com",
-        emailPassword: process.env.EMAIL_PASSWORD || "Subhamsha@2053",
+        emailPassword: process.env.EMAIL_PASSWORD || "kjjphtcoduqslwgt",
         emailFromName: process.env.EMAIL_FROM_NAME || "XenoNepal",
         supportEmail: process.env.SUPPORT_EMAIL || "support@xenonepal.com",
         enableEmailNotifications: true,
@@ -45,12 +57,31 @@ class EmailService {
 
   async initializeTransporter() {
     try {
+      console.log("=== INITIALIZING EMAIL TRANSPORTER ===");
+      console.log("Environment:", process.env.NODE_ENV);
+
       // Load email settings from database or environment
       const emailSettings = await this.loadEmailSettings();
+
       if (!emailSettings.enableEmailNotifications) {
+        console.log("Email notifications are disabled");
         return;
-      } // Using Gmail SMTP (free service)
-      this.transporter = nodemailer.createTransport({
+      }
+
+      // Validate required email settings
+      if (!emailSettings.emailUser || !emailSettings.emailPassword) {
+        console.error("❌ MISSING EMAIL CREDENTIALS:", {
+          hasEmailUser: !!emailSettings.emailUser,
+          hasEmailPassword: !!emailSettings.emailPassword,
+          emailUser: emailSettings.emailUser,
+        });
+        return;
+      }
+
+      console.log("✅ Email credentials validated");
+
+      // Using Gmail SMTP (free service)
+      this.transporter = nodemailer.createTransporter({
         service: "gmail",
         auth: {
           user: emailSettings.emailUser,
@@ -75,14 +106,44 @@ class EmailService {
       });
 
       // Verify connection
+      console.log("🔍 Verifying Gmail SMTP connection...");
       await this.transporter.verify();
-      console.log(
-        "Email service initialized successfully with user:",
-        emailSettings.emailUser
-      );
+      console.log("✅ Email service initialized successfully!");
+      console.log("📧 Email user:", emailSettings.emailUser);
+
+      // Store settings for later use
+      this.emailSettings = emailSettings;
     } catch (error) {
-      console.error("Failed to initialize email service:", error);
-      // Don't throw error, just log it so the app can still run
+      console.error("❌ FAILED TO INITIALIZE EMAIL SERVICE:");
+      console.error("Error message:", error.message);
+      console.error("Error code:", error.code);
+      console.error("Error command:", error.command);
+      console.error("Response code:", error.responseCode);
+      console.error("Response:", error.response);
+
+      // Common Gmail errors and solutions
+      if (error.code === "EAUTH") {
+        console.error("🔑 AUTHENTICATION ERROR:");
+        console.error(
+          "- Make sure you are using Gmail App Password, not regular password"
+        );
+        console.error("- Enable 2-Factor Authentication on Gmail");
+        console.error(
+          "- Generate App Password: https://myaccount.google.com/apppasswords"
+        );
+      } else if (error.code === "ENOTFOUND" || error.code === "ECONNREFUSED") {
+        console.error("🌐 NETWORK ERROR:");
+        console.error("- Check internet connection");
+        console.error("- Verify firewall/proxy settings");
+      }
+
+      // In production, attempt retry
+      if (process.env.NODE_ENV === "production") {
+        console.log("⏰ Production retry in 30 seconds...");
+        setTimeout(() => {
+          this.initializeTransporter();
+        }, 30000);
+      }
     }
   }
 
@@ -193,33 +254,42 @@ class EmailService {
   }
   async sendEmail({ to, templateType, variables = {} }) {
     try {
+      console.log(`🚀 SENDING EMAIL: ${templateType} to ${to}`);
+
       if (!this.transporter) {
-        console.log("Email service not initialized, skipping email send");
-        return false;
+        console.error(
+          "❌ Email service not initialized, attempting to reinitialize..."
+        );
+        await this.initializeTransporter();
+        if (!this.transporter) {
+          console.error("❌ Failed to initialize email service");
+          return false;
+        }
       }
 
       // Refresh email settings in case they changed (cached)
       const emailSettings = await this.loadEmailSettings();
 
       if (!emailSettings.enableEmailNotifications) {
-        console.log("Email notifications are disabled, skipping email send");
+        console.log("⚠️ Email notifications are disabled, skipping email send");
         return false;
       }
+
       const template = await this.getTemplate(templateType);
       if (!template) {
-        console.log(`Email template not found for type: ${templateType}`);
+        console.error(`❌ Email template not found for type: ${templateType}`);
         return false;
       }
 
       // Validate template content
       if (!template.htmlContent && !template.textContent) {
-        console.log(`Email template ${templateType} has no content`);
+        console.error(`❌ Email template ${templateType} has no content`);
         return false;
       }
 
       // Log template details for debugging
       console.log(
-        `Template found: ${templateType}, has HTML: ${!!template.htmlContent}, has Text: ${!!template.textContent}`
+        `✅ Template found: ${templateType}, has HTML: ${!!template.htmlContent}, has Text: ${!!template.textContent}`
       );
 
       // Add default variables using current settings
@@ -230,6 +300,7 @@ class EmailService {
         websiteUrl: "https://xenonepal.com",
         ...variables,
       };
+
       const htmlContent = this.compileTemplate(
         template.htmlContent,
         defaultVariables
@@ -256,6 +327,7 @@ class EmailService {
         }...`
       );
       console.log(`=========================\n`);
+
       const mailOptions = {
         from: `${emailSettings.emailFromName} <${emailSettings.emailUser}>`,
         to,
@@ -285,6 +357,14 @@ class EmailService {
             : undefined,
       };
 
+      console.log(`📨 Sending email with options:`, {
+        from: mailOptions.from,
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+        hasHtml: !!mailOptions.html,
+        hasText: !!mailOptions.text,
+      });
+
       // Send email with timeout to prevent hanging
       const info = await Promise.race([
         this.transporter.sendMail(mailOptions),
@@ -292,11 +372,36 @@ class EmailService {
           setTimeout(() => reject(new Error("Email send timeout")), 30000)
         ),
       ]);
-
-      console.log(`Email sent successfully to ${to}:`, info.messageId);
+      console.log(`✅ EMAIL SENT SUCCESSFULLY to ${to}:`, {
+        messageId: info.messageId,
+        response: info.response,
+        accepted: info.accepted,
+        rejected: info.rejected,
+      });
       return true;
     } catch (error) {
-      console.error("Error sending email:", error);
+      console.error(`❌ ERROR SENDING EMAIL to ${to}:`);
+      console.error("Error message:", error.message);
+      console.error("Error code:", error.code);
+      console.error("Error stack:", error.stack);
+
+      // Specific error handling for common Gmail SMTP errors
+      if (error.code === "EAUTH") {
+        console.error("🔑 Authentication failed - check Gmail App Password");
+      } else if (error.code === "EENVELOPE") {
+        console.error("📧 Invalid email address");
+      } else if (error.code === "EMESSAGE") {
+        console.error("📝 Invalid message content");
+      } else if (error.message.includes("timeout")) {
+        console.error("⏰ Email send timeout - network issue");
+      }
+
+      // Try to reinitialize transporter on auth errors
+      if (error.code === "EAUTH" && process.env.NODE_ENV === "production") {
+        console.log("🔄 Attempting to reinitialize email service...");
+        setTimeout(() => this.initializeTransporter(), 5000);
+      }
+
       return false;
     }
   }

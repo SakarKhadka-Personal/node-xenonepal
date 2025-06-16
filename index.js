@@ -8,6 +8,10 @@ const cors = require("cors");
 const PORT = process.env.PORT || 5000;
 const app = express();
 
+// Initialize email service on startup
+console.log("🚀 Starting XenoNepal Server...");
+console.log("Environment:", process.env.NODE_ENV);
+
 // Security middleware
 app.use(helmet());
 
@@ -80,9 +84,18 @@ app.use("*", (req, res) => {
 // Initialize database connection
 dbConnect();
 
+// Initialize email service
+console.log("📧 Initializing email service...");
+const emailService = require("./src/email/emailService");
+
 // Start server
 const server = app.listen(PORT, function () {
-  // Server started successfully
+  console.log(`✅ Server Is Running On Port ${PORT}`);
+  console.log(`🌐 Environment: ${process.env.NODE_ENV}`);
+  console.log(`🔗 Local URL: http://localhost:${PORT}`);
+  if (process.env.NODE_ENV === "production") {
+    console.log(`🌍 Production URL: https://xenonepal.com`);
+  }
 });
 
 // Set server timeout to prevent hanging connections

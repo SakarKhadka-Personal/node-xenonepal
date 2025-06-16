@@ -1,8 +1,7 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
+  "main": "index.js",  "scripts": {
     "start": "node index.js",
     "dev": "pm2 start ecosystem.config.js --env development",
     "prod": "pm2 start ecosystem.config.js --env production",
@@ -12,7 +11,9 @@
     "status": "pm2 status",
     "logs": "pm2 logs xenonepal-server",
     "monitor": "pm2 monit",
-    "deploy": "npm run stop; npm run delete; npm run prod",
+    "deploy": "node deploy-production.js",
+    "deploy-old": "npm run stop; npm run delete; npm run prod",
+    "test-email": "node test-email.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
