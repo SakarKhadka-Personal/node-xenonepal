@@ -21,8 +21,6 @@ router.post("/test-html", async (req, res) => {
     if (!to) {
       return res.status(400).json({ message: "Email address is required" });
     }
-
-    console.log(`Testing HTML email send to: ${to}`);
     const result = await emailService.sendTestHtmlEmail(to);
 
     if (result) {

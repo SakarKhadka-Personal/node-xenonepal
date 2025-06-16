@@ -63,9 +63,7 @@ const processIndexingRequest = async (request) => {
 
     // Method 3: Yandex IndexNow
     await submitToYandex(url);
-
     request.status = "completed";
-    console.log(`✅ IndexNow submitted for: ${url}`);
   } catch (error) {
     request.status = "failed";
     console.error("IndexNow submission failed:", error);
@@ -270,11 +268,8 @@ const googleIndexingAPI = async (req, res) => {
 
     if (!url) {
       return res.status(400).json({ error: "URL is required" });
-    }
-
-    // In production, this would use Google's Indexing API with service account
-    // For now, we'll simulate the process and log the request
-    console.log(`[Google Indexing API] ${type}: ${url}`);
+    } // In production, this would use Google's Indexing API with service account
+    // For now, we'll simulate the process
 
     // Add to our internal indexing queue
     const indexingRequest = {
@@ -317,10 +312,7 @@ const submitURL = async (req, res) => {
       return res.status(400).json({ error: "Invalid domain" });
     }
 
-    // Log the submission
-    console.log(`[URL Submission] ${url}`);
-
-    // Add to indexing queue
+    // Log the submission    // Add to indexing queue
     const submissionRequest = {
       url,
       service: "url-submission",

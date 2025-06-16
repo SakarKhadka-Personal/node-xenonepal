@@ -82,7 +82,7 @@ dbConnect();
 
 // Start server
 const server = app.listen(PORT, function () {
-  console.log(`Server Is Running On Port ${PORT}`);
+  // Server started successfully
 });
 
 // Set server timeout to prevent hanging connections
@@ -90,17 +90,13 @@ server.timeout = 30000; // 30 seconds
 
 // Graceful shutdown
 process.on("SIGTERM", () => {
-  console.log("SIGTERM received, shutting down gracefully");
   server.close(() => {
-    console.log("Server closed");
     process.exit(0);
   });
 });
 
 process.on("SIGINT", () => {
-  console.log("SIGINT received, shutting down gracefully");
   server.close(() => {
-    console.log("Server closed");
     process.exit(0);
   });
 });

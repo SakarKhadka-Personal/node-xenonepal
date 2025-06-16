@@ -47,9 +47,7 @@ class EmailService {
     try {
       // Load email settings from database or environment
       const emailSettings = await this.loadEmailSettings();
-
       if (!emailSettings.enableEmailNotifications) {
-        console.log("Email notifications are disabled");
         return;
       } // Using Gmail SMTP (free service)
       this.transporter = nodemailer.createTransport({
