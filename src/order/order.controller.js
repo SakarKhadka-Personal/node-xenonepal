@@ -69,12 +69,23 @@ exports.createOrder = async (req, res) => {
 // Get all orders (admin) with pagination and filtering
 exports.getAllOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status } = req.query;
+    const { page = 1, limit = 10, status, search } = req.query;
 
     // Build filter object
     const filter = {};
     if (status) {
       filter.status = status.toLowerCase();
+    }
+
+    // Add search functionality
+    if (search) {
+      filter.$or = [
+        { _id: { $regex: search, $options: "i" } },
+        { "order.username": { $regex: search, $options: "i" } },
+        { "order.playerID": { $regex: search, $options: "i" } },
+        { "order.title": { $regex: search, $options: "i" } },
+        { status: { $regex: search, $options: "i" } },
+      ];
     }
 
     // Get paginated results
@@ -123,14 +134,56 @@ exports.getAllOrders = async (req, res) => {
       })
     );
 
-    // Get total count for pagination
+    // For search, also search within user information if needed
+    let finalOrdersWithUserInfo = ordersWithUserInfo;
+    if (search && !status) {
+      // Additional filtering for user-related search terms
+      finalOrdersWithUserInfo = ordersWithUserInfo.filter((order) => {
+        const searchTerm = search.toLowerCase();
+
+        // Search in order fields
+        const orderMatch = [
+          order._id?.toString(),
+          order.order?.username,
+          order.order?.playerID,
+          order.order?.title,
+          order.status,
+        ].some((field) => field?.toLowerCase().includes(searchTerm));
+
+        // Search in user info
+        const userMatch =
+          order.userInfo &&
+          [order.userInfo.name, order.userInfo.email].some((field) =>
+            field?.toLowerCase().includes(searchTerm)
+          );
+
+        return orderMatch || userMatch;
+      });
+    }
+
+    // Get total count for pagination (without search filtering for user info)
     const total = await Order.countDocuments(filter);
 
+    // Get status counts for all orders (not just filtered ones)
+    const [totalDelivered, totalPending, totalProcessing, totalCancelled] =
+      await Promise.all([
+        Order.countDocuments({ status: "delivered" }),
+        Order.countDocuments({ status: "pending" }),
+        Order.countDocuments({ status: "processing" }),
+        Order.countDocuments({ status: "cancelled" }),
+      ]);
+
     res.json({
-      orders: ordersWithUserInfo,
+      orders: finalOrdersWithUserInfo,
       totalPages: Math.ceil(total / limit),
       currentPage: page,
       total,
+      statusCounts: {
+        delivered: totalDelivered,
+        pending: totalPending,
+        processing: totalProcessing,
+        cancelled: totalCancelled,
+      },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
