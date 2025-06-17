@@ -46,6 +46,10 @@ const productSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  gameIdCheckerUrl: {
+    type: String,
+    required: false,
+  },
   productQuantity: [
     {
       quantity: {
