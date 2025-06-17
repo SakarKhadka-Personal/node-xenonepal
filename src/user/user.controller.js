@@ -313,6 +313,191 @@ const getUserByGoogleId = async (req, res) => {
   }
 };
 
+// XenoCoin utility function to calculate earned coins
+const calculateXenoCoins = (amountSpent) => {
+  // 1 XenoCoin for every 1000 rupees spent
+  return Math.floor(amountSpent / 1000);
+};
+
+// Award XenoCoins to user for order
+const awardXenoCoins = async (userId, orderId, amountSpent) => {
+  try {
+    const coinsEarned = calculateXenoCoins(amountSpent);
+
+    if (coinsEarned > 0) {
+      await User.findOneAndUpdate(
+        { googleId: userId },
+        {
+          $inc: { xenoCoins: coinsEarned },
+          $push: {
+            xenoCoinHistory: {
+              type: "earn",
+              amount: coinsEarned,
+              source: "order_purchase",
+              description: `Earned ${coinsEarned} XenoCoins for order worth NPR ${amountSpent}`,
+              orderId: orderId,
+              date: new Date(),
+            },
+          },
+        }
+      );
+    }
+
+    return coinsEarned;
+  } catch (error) {
+    console.error("Error awarding XenoCoins:", error);
+    return 0;
+  }
+};
+
+// Admin function to credit/debit XenoCoins
+const adminModifyXenoCoins = async (req, res) => {
+  try {
+    const { targetUserId, amount, type, description, adminId } = req.body;
+
+    if (!targetUserId || !amount || !type || !adminId) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    if (type !== "admin_credit" && type !== "admin_debit") {
+      return res.status(400).json({ message: "Invalid transaction type" });
+    }
+
+    const user = await User.findOne({ googleId: targetUserId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if user has enough coins for debit
+    if (type === "admin_debit" && user.xenoCoins < amount) {
+      return res.status(400).json({ message: "Insufficient XenoCoins" });
+    }
+
+    const updateAmount = type === "admin_credit" ? amount : -amount;
+
+    await User.findOneAndUpdate(
+      { googleId: targetUserId },
+      {
+        $inc: { xenoCoins: updateAmount },
+        $push: {
+          xenoCoinHistory: {
+            type: type,
+            amount: amount,
+            source: "admin_action",
+            description:
+              description ||
+              `Admin ${type.replace("admin_", "")} of ${amount} XenoCoins`,
+            adminId: adminId,
+            date: new Date(),
+          },
+        },
+      }
+    );
+
+    const updatedUser = await User.findOne({ googleId: targetUserId });
+
+    res.status(200).json({
+      message: `Successfully ${type.replace(
+        "admin_",
+        ""
+      )}ed ${amount} XenoCoins`,
+      newBalance: updatedUser.xenoCoins,
+    });
+  } catch (error) {
+    console.error("Error modifying XenoCoins:", error);
+    res.status(500).json({ message: "Failed to modify XenoCoins" });
+  }
+};
+
+// Get XenoCoin history for a user
+const getXenoCoinHistory = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { page = 1, limit = 10, type } = req.query;
+
+    const user = await User.findOne({ googleId: userId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    let history = user.xenoCoinHistory;
+
+    // Filter by type if provided
+    if (type && type !== "all") {
+      history = history.filter((entry) => entry.type === type);
+    }
+
+    // Sort by date (newest first)
+    history = history.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Paginate
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+    const paginatedHistory = history.slice(startIndex, endIndex);
+
+    res.status(200).json({
+      currentBalance: user.xenoCoins,
+      history: paginatedHistory,
+      totalEntries: history.length,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(history.length / limit),
+    });
+  } catch (error) {
+    console.error("Error fetching XenoCoin history:", error);
+    res.status(500).json({ message: "Failed to fetch XenoCoin history" });
+  }
+};
+
+// Get all users with XenoCoin stats (Admin only)
+const getUsersWithXenoCoinStats = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = "" } = req.query;
+
+    const filter = {};
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const users = await User.find(filter)
+      .select("name email xenoCoins xenoCoinHistory createdAt")
+      .sort({ xenoCoins: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const usersWithStats = users.map((user) => ({
+      ...user.toObject(),
+      totalEarned: user.xenoCoinHistory
+        .filter(
+          (entry) => entry.type === "earn" || entry.type === "admin_credit"
+        )
+        .reduce((sum, entry) => sum + entry.amount, 0),
+      totalSpent: user.xenoCoinHistory
+        .filter(
+          (entry) => entry.type === "spend" || entry.type === "admin_debit"
+        )
+        .reduce((sum, entry) => sum + entry.amount, 0),
+      transactionCount: user.xenoCoinHistory.length,
+    }));
+
+    const total = await User.countDocuments(filter);
+
+    res.status(200).json({
+      users: usersWithStats,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / limit),
+      totalUsers: total,
+    });
+  } catch (error) {
+    console.error("Error fetching users with XenoCoin stats:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch users with XenoCoin stats" });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getSingleUser,
@@ -322,4 +507,9 @@ module.exports = {
   getUserStats,
   syncUser,
   getUserByGoogleId,
+  // XenoCoin functions
+  awardXenoCoins,
+  adminModifyXenoCoins,
+  getXenoCoinHistory,
+  getUsersWithXenoCoinStats,
 };

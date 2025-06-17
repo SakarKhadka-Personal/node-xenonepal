@@ -1,6 +1,7 @@
 const Order = require("./order.model");
 const User = require("../user/user.model");
 const emailService = require("../email/emailService");
+const { awardXenoCoins } = require("../user/user.controller");
 
 // Create a new order
 exports.createOrder = async (req, res) => {
@@ -222,15 +223,26 @@ exports.updateOrderStatus = async (req, res) => {
     res.json({
       message: "Order status updated successfully",
       order: updatedOrder,
-    });
-
-    // Send email notifications asynchronously (non-blocking)
+    }); // Send email notifications asynchronously (non-blocking)
     setImmediate(async () => {
       try {
         const user = await User.findOne({ googleId: updatedOrder.userId });
         if (user && user.email) {
-          // Send customer delivery notification for delivered orders
+          // Award XenoCoins for delivered orders
           if (status.toLowerCase() === "delivered") {
+            const orderAmount =
+              updatedOrder.order.price || updatedOrder.order.totalAmount || 0;
+            const coinsAwarded = await awardXenoCoins(
+              updatedOrder.userId,
+              updatedOrder._id,
+              orderAmount
+            );
+
+            console.log(
+              `Awarded ${coinsAwarded} XenoCoins to user ${user.email} for order ${updatedOrder._id}`
+            );
+
+            // Send customer delivery notification for delivered orders
             await emailService.sendOrderDeliveredEmail(user.email, {
               userName: user.name,
               orderId: updatedOrder._id.toString().slice(-8),

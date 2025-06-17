@@ -8,6 +8,9 @@ const {
   deleteUser,
   getUserStats,
   syncUser,
+  adminModifyXenoCoins,
+  getXenoCoinHistory,
+  getUsersWithXenoCoinStats,
 } = require("./user.controller");
 
 const router = express.Router();
@@ -35,5 +38,10 @@ router.patch("/:id", updateUser);
 
 // Delete user
 router.delete("/:id", deleteUser);
+
+// XenoCoin routes
+router.post("/xenocoin/admin-modify", adminModifyXenoCoins);
+router.get("/xenocoin/history/:userId", getXenoCoinHistory);
+router.get("/xenocoin/admin/users", getUsersWithXenoCoinStats);
 
 module.exports = router;

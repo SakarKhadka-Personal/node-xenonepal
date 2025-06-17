@@ -38,6 +38,47 @@ const userSchema = new mongoose.Schema({
     default: "",
   },
 
+  // XenoCoin System
+  xenoCoins: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  xenoCoinHistory: [
+    {
+      type: {
+        type: String,
+        enum: ["earn", "spend", "admin_credit", "admin_debit"],
+        required: true,
+      },
+      amount: {
+        type: Number,
+        required: true,
+      },
+      source: {
+        type: String,
+        required: true, // e.g., 'order_purchase', 'admin_action', 'bonus'
+      },
+      description: {
+        type: String,
+        default: "",
+      },
+      orderId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Order",
+        required: false,
+      },
+      adminId: {
+        type: String, // Firebase UID of admin who performed the action
+        required: false,
+      },
+      date: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
+
   lastLogin: {
     type: Date,
     default: Date.now,
