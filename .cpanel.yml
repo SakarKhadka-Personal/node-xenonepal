@@ -2,7 +2,7 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/xenonepa/xenonepal/
-    - /bin/cp  src/* $DEPLOYPATH
-    - /bin/cp index.js $DEPLOYPATH
-    - /bin/cp package-lock.json $DEPLOYPATH
-    - /bin/cp package.json  $DEPLOYPATH
+    - /bin/cp -r src $DEPLOYPATH
+    - /bin/cp -r index.js $DEPLOYPATH
+    - /bin/cp -r package-lock.json $DEPLOYPATH
+    - /bin/cp -r package.json  $DEPLOYPATH
