@@ -50,6 +50,15 @@ const productSchema = new mongoose.Schema({
     type: String,
     required: false,
   },
+  // Zone ID support fields
+  requiresZoneId: {
+    type: Boolean,
+    default: false,
+  },
+  placeholderZoneId: {
+    type: String,
+    required: false,
+  },
   productQuantity: [
     {
       quantity: {

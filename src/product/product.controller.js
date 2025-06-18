@@ -4,7 +4,7 @@ const axios = require("axios");
 // Game ID Validation endpoint
 const validateGameId = async (req, res) => {
   try {
-    const { gameIdCheckerUrl, playerId } = req.body;
+    const { gameIdCheckerUrl, playerId, zoneId } = req.body;
 
     if (!gameIdCheckerUrl || !playerId) {
       return res.status(400).json({
@@ -13,8 +13,11 @@ const validateGameId = async (req, res) => {
       });
     }
 
-    // Extract the base URL and append the player ID
-    const apiUrl = `${gameIdCheckerUrl}/${playerId}`;
+    // Build the API URL - append zone ID if provided
+    let apiUrl = `${gameIdCheckerUrl}/${playerId}`;
+    if (zoneId) {
+      apiUrl += `/${zoneId}`;
+    }
 
     const options = {
       method: "GET",
