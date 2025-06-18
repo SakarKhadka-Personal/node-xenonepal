@@ -40,17 +40,15 @@ const createCoupon = async (req, res) => {
         success: false,
         message: "Coupon code already exists",
       });
-    }
-
-    // Create the new coupon
+    } // Create the new coupon
     const newCoupon = new Coupon({
       code: code.toUpperCase(),
       discountType,
       discountValue,
       maxDiscount: discountType === "percentage" ? maxDiscount : 0,
       validFor,
-      users: validFor === "user" ? users : [],
-      products: validFor === "product" ? products : [],
+      users: validFor === "user" || validFor === "both" ? users : [],
+      products: validFor === "product" || validFor === "both" ? products : [],
       usageLimit,
       usagePerUser,
       expiresAt: new Date(expiresAt),
@@ -144,11 +142,9 @@ const updateCoupon = async (req, res) => {
     // Handle date conversion
     if (updateData.expiresAt) {
       updateData.expiresAt = new Date(updateData.expiresAt);
-    }
-
-    // Filter out empty arrays
+    } // Filter out empty arrays
     if (
-      updateData.validFor === "user" &&
+      (updateData.validFor === "user" || updateData.validFor === "both") &&
       (!updateData.users || updateData.users.length === 0)
     ) {
       return res.status(400).json({
@@ -158,7 +154,7 @@ const updateCoupon = async (req, res) => {
     }
 
     if (
-      updateData.validFor === "product" &&
+      (updateData.validFor === "product" || updateData.validFor === "both") &&
       (!updateData.products || updateData.products.length === 0)
     ) {
       return res.status(400).json({
@@ -176,6 +172,7 @@ const updateCoupon = async (req, res) => {
     } else if (updateData.validFor === "product") {
       updateData.users = [];
     }
+    // For "both", keep both arrays as they are
 
     const updatedCoupon = await Coupon.findByIdAndUpdate(id, updateData, {
       new: true,
@@ -349,13 +346,16 @@ const validateAndApplyCoupon = async (req, res) => {
           usageLimit: coupon.usageLimit,
         },
       });
-    }
-
-    // Check user-specific validation
+    } // Check user-specific validation
     const userUsageCount = coupon.usedBy.filter(
       (usage) => usage.userId === userId
-    ).length; // Check if user can use this coupon (user-specific coupons)
-    if (coupon.validFor === "user" && !coupon.users.includes(userId)) {
+    ).length;
+
+    // Check if user can use this coupon (user-specific or both types)
+    if (
+      (coupon.validFor === "user" || coupon.validFor === "both") &&
+      !coupon.users.includes(userId)
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -387,8 +387,14 @@ const validateAndApplyCoupon = async (req, res) => {
           },
         });
       }
-    } // For product-specific coupons, check if applicable to any product in cart
-    if (coupon.validFor === "product" && products && products.length > 0) {
+    }
+
+    // For product-specific coupons or both types, check if applicable to any product in cart
+    if (
+      (coupon.validFor === "product" || coupon.validFor === "both") &&
+      products &&
+      products.length > 0
+    ) {
       const hasValidProduct = products.some((product) =>
         coupon.canBeAppliedTo(product.productId)
       );

@@ -26,7 +26,7 @@ const couponSchema = new mongoose.Schema({
   validFor: {
     type: String,
     required: true,
-    enum: ["all", "user", "product"],
+    enum: ["all", "user", "product", "both"],
     default: "all",
   },
   users: [
@@ -102,8 +102,11 @@ couponSchema.virtual("hasReachedLimit").get(function () {
 
 // Method to check if a user can use this coupon
 couponSchema.methods.canBeUsedBy = function (userId) {
-  // Check if coupon is for specific users
-  if (this.validFor === "user" && !this.users.includes(userId)) {
+  // Check if coupon is for specific users or both (specific users & products)
+  if (
+    (this.validFor === "user" || this.validFor === "both") &&
+    !this.users.includes(userId)
+  ) {
     return false;
   }
 
@@ -116,13 +119,17 @@ couponSchema.methods.canBeUsedBy = function (userId) {
 
 // Method to check if a coupon can be applied to a product
 couponSchema.methods.canBeAppliedTo = function (productId) {
-  // If coupon is for all products or specific users, it can be applied to any product
+  // If coupon is for all products or specific users only, it can be applied to any product
   if (this.validFor === "all" || this.validFor === "user") {
     return true;
   }
 
-  // If coupon is for specific products, check if the product is included
-  return this.products.some((id) => id.toString() === productId.toString());
+  // If coupon is for specific products or both (specific users & products), check if the product is included
+  if (this.validFor === "product" || this.validFor === "both") {
+    return this.products.some((id) => id.toString() === productId.toString());
+  }
+
+  return false;
 };
 
 // Method to calculate discount amount
