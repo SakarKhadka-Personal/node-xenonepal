@@ -315,8 +315,15 @@ const getUserByGoogleId = async (req, res) => {
 
 // XenoCoin utility function to calculate earned coins
 const calculateXenoCoins = (amountSpent) => {
-  // 1 XenoCoin for every 1000 rupees spent
-  return Math.floor(amountSpent / 1000);
+  // Dynamic calculation: 1000 rupees = 1 XenoCoin
+  // This means 100 rupees = 0.1 XenoCoin, 500 rupees = 0.5 XenoCoin, etc.
+  const coinRate = 1000; // 1 XenoCoin per 1000 rupees
+  const coinsEarned = amountSpent / coinRate;
+
+  // Round to 1 decimal place for better precision
+  // Examples:
+  // 100 NPR = 0.1 XC, 500 NPR = 0.5 XC, 1500 NPR = 1.5 XC
+  return Math.round(coinsEarned * 10) / 10;
 };
 
 // Award XenoCoins to user for order
@@ -325,7 +332,7 @@ const awardXenoCoins = async (userId, orderId, amountSpent) => {
     const coinsEarned = calculateXenoCoins(amountSpent);
 
     if (coinsEarned > 0) {
-      await User.findOneAndUpdate(
+      const updateResult = await User.findOneAndUpdate(
         { googleId: userId },
         {
           $inc: { xenoCoins: coinsEarned },
@@ -339,13 +346,17 @@ const awardXenoCoins = async (userId, orderId, amountSpent) => {
               date: new Date(),
             },
           },
-        }
+        },
+        { new: true }
       );
+
+      if (!updateResult) {
+        throw new Error(`User not found with googleId: ${userId}`);
+      }
     }
 
     return coinsEarned;
   } catch (error) {
-    console.error("Error awarding XenoCoins:", error);
     return 0;
   }
 };
@@ -363,49 +374,66 @@ const adminModifyXenoCoins = async (req, res) => {
       return res.status(400).json({ message: "Invalid transaction type" });
     }
 
+    // Parse and validate amount (allow decimals)
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({ message: "Invalid amount" });
+    }
+
+    // Round to 1 decimal place for consistency
+    const roundedAmount = Math.round(parsedAmount * 10) / 10;
+
     const user = await User.findOne({ googleId: targetUserId });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
     // Check if user has enough coins for debit
-    if (type === "admin_debit" && user.xenoCoins < amount) {
+    if (type === "admin_debit" && user.xenoCoins < roundedAmount) {
       return res.status(400).json({ message: "Insufficient XenoCoins" });
     }
 
-    const updateAmount = type === "admin_credit" ? amount : -amount;
+    const updateAmount =
+      type === "admin_credit" ? roundedAmount : -roundedAmount;
 
-    await User.findOneAndUpdate(
+    const updateResult = await User.findOneAndUpdate(
       { googleId: targetUserId },
       {
         $inc: { xenoCoins: updateAmount },
         $push: {
           xenoCoinHistory: {
             type: type,
-            amount: amount,
+            amount: roundedAmount,
             source: "admin_action",
             description:
               description ||
-              `Admin ${type.replace("admin_", "")} of ${amount} XenoCoins`,
+              `Admin ${type.replace(
+                "admin_",
+                ""
+              )} of ${roundedAmount} XenoCoins`,
             adminId: adminId,
             date: new Date(),
           },
         },
-      }
+      },
+      { new: true }
     );
 
-    const updatedUser = await User.findOne({ googleId: targetUserId });
+    if (!updateResult) {
+      return res.status(500).json({ message: "Failed to update user" });
+    }
 
     res.status(200).json({
       message: `Successfully ${type.replace(
         "admin_",
         ""
-      )}ed ${amount} XenoCoins`,
-      newBalance: updatedUser.xenoCoins,
+      )}ed ${roundedAmount} XenoCoins`,
+      newBalance: updateResult.xenoCoins,
     });
   } catch (error) {
-    console.error("Error modifying XenoCoins:", error);
-    res.status(500).json({ message: "Failed to modify XenoCoins" });
+    res
+      .status(500)
+      .json({ message: "Failed to modify XenoCoins", error: error.message });
   }
 };
 
@@ -419,8 +447,7 @@ const getXenoCoinHistory = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-
-    let history = user.xenoCoinHistory;
+    let history = user.xenoCoinHistory || [];
 
     // Filter by type if provided
     if (type && type !== "all") {
@@ -443,8 +470,11 @@ const getXenoCoinHistory = async (req, res) => {
       totalPages: Math.ceil(history.length / limit),
     });
   } catch (error) {
-    console.error("Error fetching XenoCoin history:", error);
-    res.status(500).json({ message: "Failed to fetch XenoCoin history" });
+    console.error("❌ Error fetching XenoCoin history:", error);
+    res.status(500).json({
+      message: "Failed to fetch XenoCoin history",
+      error: error.message,
+    });
   }
 };
 
@@ -460,9 +490,8 @@ const getUsersWithXenoCoinStats = async (req, res) => {
         { email: { $regex: search, $options: "i" } },
       ];
     }
-
     const users = await User.find(filter)
-      .select("name email xenoCoins xenoCoinHistory createdAt")
+      .select("name email googleId xenoCoins xenoCoinHistory createdAt")
       .sort({ xenoCoins: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -481,7 +510,6 @@ const getUsersWithXenoCoinStats = async (req, res) => {
         .reduce((sum, entry) => sum + entry.amount, 0),
       transactionCount: user.xenoCoinHistory.length,
     }));
-
     const total = await User.countDocuments(filter);
 
     res.status(200).json({
@@ -491,10 +519,106 @@ const getUsersWithXenoCoinStats = async (req, res) => {
       totalUsers: total,
     });
   } catch (error) {
-    console.error("Error fetching users with XenoCoin stats:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to fetch users with XenoCoin stats" });
+    res.status(500).json({
+      message: "Failed to fetch users with XenoCoin stats",
+      error: error.message,
+    });
+  }
+};
+
+// Test endpoint to manually award XenoCoins
+const testAwardXenoCoins = async (req, res) => {
+  try {
+    const { userId, amount } = req.body;
+
+    if (!userId || !amount) {
+      return res.status(400).json({
+        message: "userId and amount are required",
+        example: { userId: "firebase_uid", amount: 1500 },
+      });
+    }
+    const user = await User.findOne({ googleId: userId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const coinsAwarded = await awardXenoCoins(
+      userId,
+      "test_order_" + Date.now(),
+      parseFloat(amount)
+    );
+
+    res.status(200).json({
+      message: "Test XenoCoin award completed",
+      user: user.email,
+      amountSpent: amount,
+      coinsAwarded: coinsAwarded,
+      calculation: `${amount} NPR ÷ 1000 = ${coinsAwarded} XenoCoins`,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Test failed", error: error.message });
+  }
+};
+
+// Test endpoint to manually trigger order delivery and XenoCoin award
+const testOrderDelivery = async (req, res) => {
+  try {
+    const { orderId } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({
+        message: "orderId is required",
+        instruction: "Provide a real order ID from your database",
+      });
+    }
+    const Order = require("../order/order.model");
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Simulate the XenoCoin award process
+    const user = await User.findOne({ googleId: order.userId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found for this order" });
+    }
+
+    const orderAmount =
+      order.order.price ||
+      order.order.totalAmount ||
+      order.order.amount ||
+      order.order.cost ||
+      0;
+
+    if (orderAmount > 0) {
+      const coinsAwarded = await awardXenoCoins(
+        order.userId,
+        order._id,
+        orderAmount
+      );
+
+      res.status(200).json({
+        message: "Test order delivery completed",
+        order: {
+          id: orderId,
+          userId: order.userId,
+          userEmail: user.email,
+          orderAmount: orderAmount,
+          coinsAwarded: coinsAwarded,
+          orderDetails: order.order,
+        },
+      });
+    } else {
+      res.status(400).json({
+        message: "Order amount is 0 or undefined",
+        orderDetails: order.order,
+        suggestion: "Check how order prices are stored in your frontend",
+      });
+    }
+  } catch (error) {
+    console.error("Error in test order delivery:", error);
+    res.status(500).json({ message: "Test failed", error: error.message });
   }
 };
 
@@ -512,4 +636,7 @@ module.exports = {
   adminModifyXenoCoins,
   getXenoCoinHistory,
   getUsersWithXenoCoinStats,
+  testAwardXenoCoins,
+  testOrderDelivery,
+  testOrderDelivery,
 };

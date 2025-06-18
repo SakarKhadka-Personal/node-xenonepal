@@ -11,6 +11,8 @@ const {
   adminModifyXenoCoins,
   getXenoCoinHistory,
   getUsersWithXenoCoinStats,
+  testAwardXenoCoins,
+  testOrderDelivery,
 } = require("./user.controller");
 
 const router = express.Router();
@@ -43,5 +45,7 @@ router.delete("/:id", deleteUser);
 router.post("/xenocoin/admin-modify", adminModifyXenoCoins);
 router.get("/xenocoin/history/:userId", getXenoCoinHistory);
 router.get("/xenocoin/admin/users", getUsersWithXenoCoinStats);
+router.post("/xenocoin/test-award", testAwardXenoCoins);
+router.post("/xenocoin/test-delivery", testOrderDelivery);
 
 module.exports = router;

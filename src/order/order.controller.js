@@ -230,17 +230,36 @@ exports.updateOrderStatus = async (req, res) => {
         if (user && user.email) {
           // Award XenoCoins for delivered orders
           if (status.toLowerCase() === "delivered") {
+            // Try multiple ways to get the order amount
             const orderAmount =
-              updatedOrder.order.price || updatedOrder.order.totalAmount || 0;
-            const coinsAwarded = await awardXenoCoins(
-              updatedOrder.userId,
-              updatedOrder._id,
-              orderAmount
-            );
+              updatedOrder.order.price ||
+              updatedOrder.order.totalAmount ||
+              updatedOrder.order.amount ||
+              updatedOrder.order.cost ||
+              0;
 
-            console.log(
-              `Awarded ${coinsAwarded} XenoCoins to user ${user.email} for order ${updatedOrder._id}`
-            );
+            console.log("Order data for XenoCoin calculation:", {
+              orderId: updatedOrder._id,
+              userId: updatedOrder.userId,
+              orderObject: updatedOrder.order,
+              extractedAmount: orderAmount,
+            });
+
+            if (orderAmount > 0) {
+              const coinsAwarded = await awardXenoCoins(
+                updatedOrder.userId,
+                updatedOrder._id,
+                orderAmount
+              );
+
+              console.log(
+                `✅ Awarded ${coinsAwarded} XenoCoins to user ${user.email} for order ${updatedOrder._id} (Amount: NPR ${orderAmount})`
+              );
+            } else {
+              console.log(
+                `❌ No XenoCoins awarded - Order amount is 0 or undefined for order ${updatedOrder._id}`
+              );
+            }
 
             // Send customer delivery notification for delivered orders
             await emailService.sendOrderDeliveredEmail(user.email, {
