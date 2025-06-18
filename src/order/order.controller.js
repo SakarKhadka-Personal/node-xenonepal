@@ -1,28 +1,105 @@
 const Order = require("./order.model");
 const User = require("../user/user.model");
+const Coupon = require("../coupon/coupon.model");
 const emailService = require("../email/emailService");
 const { awardXenoCoins } = require("../user/user.controller");
 
 // Create a new order
 exports.createOrder = async (req, res) => {
   try {
-    const { order, paymentMethod, paymentScreenshot, userId } = req.body;
-    const newOrder = await Order.create({
+    const { order, paymentMethod, paymentScreenshot, userId, coupon } =
+      req.body;
+
+    // Create order object with base properties
+    const orderData = {
       userId, // Store Firebase UID directly
       order,
       paymentMethod,
       paymentScreenshot,
-    }); // Send order confirmation email to customer
+    };
+
+    // Add coupon information if provided
+    if (coupon && coupon.code) {
+      orderData.coupon = {
+        code: coupon.code,
+        discountAmount: coupon.discountAmount,
+        discountType: coupon.discountType,
+      };
+    }
+
+    const newOrder = await Order.create(orderData); // Record coupon usage AFTER order creation
+    if (coupon && coupon.code) {
+      try {
+        // Record coupon usage directly in database
+        const couponDoc = await Coupon.findOne({
+          code: coupon.code.toUpperCase(),
+        });
+        if (couponDoc) {
+          // Double-check limits before recording usage (race condition protection)
+          const userUsageCount = couponDoc.usedBy.filter(
+            (usage) => usage.userId === userId
+          ).length;
+
+          if (userUsageCount >= couponDoc.usagePerUser) {
+            console.warn(
+              `User ${userId} attempted to exceed per-user limit for coupon ${coupon.code}`
+            );
+            // Don't record usage but don't fail the order
+            return;
+          }
+
+          if (couponDoc.usedBy.length >= couponDoc.usageLimit) {
+            console.warn(`Coupon ${coupon.code} usage limit exceeded`);
+            // Don't record usage but don't fail the order
+            return;
+          }
+
+          couponDoc.usedBy.push({
+            userId,
+            orderId: newOrder._id,
+            date: new Date(),
+            discountAmount: coupon.discountAmount,
+          });
+          await couponDoc.save();
+          console.log(
+            `Coupon usage recorded for ${
+              coupon.code
+            } by user ${userId}. Total uses: ${couponDoc.usedBy.length}/${
+              couponDoc.usageLimit
+            }, User uses: ${userUsageCount + 1}/${couponDoc.usagePerUser}`
+          );
+        } else {
+          console.warn(
+            `Coupon ${coupon.code} not found when trying to record usage`
+          );
+        }
+      } catch (couponError) {
+        console.error("Failed to record coupon usage:", couponError);
+        // Don't fail the order creation if coupon recording fails
+      }
+    }
+
+    // Send order confirmation email to customer
     try {
       const user = await User.findOne({ googleId: userId });
       if (user && user.email) {
+        // Calculate final amount with coupon discount if applicable
+        const originalAmount = order.price || order.totalAmount;
+        const discountAmount = orderData.coupon
+          ? orderData.coupon.discountAmount
+          : 0;
+        const finalAmount = originalAmount - discountAmount;
+
         // Send customer confirmation email
         await emailService.sendOrderCompletionEmail(user.email, {
           userName: user.name,
           orderId: newOrder._id.toString().slice(-8),
           productName: order.title || "Gaming Product",
           quantity: order.quantity || 1,
-          totalAmount: order.price || order.totalAmount,
+          totalAmount: finalAmount,
+          originalAmount: originalAmount,
+          discountAmount: discountAmount,
+          couponCode: orderData.coupon ? orderData.coupon.code : null,
           currency: order.currency || "NPR",
           paymentMethod: paymentMethod || "Not specified",
           playerID: order.playerID,
@@ -39,7 +116,10 @@ exports.createOrder = async (req, res) => {
               customerEmail: user.email,
               productName: order.title || "Gaming Product",
               quantity: order.quantity || 1,
-              totalAmount: order.price || order.totalAmount,
+              totalAmount: finalAmount,
+              originalAmount: originalAmount,
+              discountAmount: discountAmount,
+              couponCode: orderData.coupon ? orderData.coupon.code : null,
               currency: order.currency || "NPR",
               playerID: order.playerID,
               username: order.username,

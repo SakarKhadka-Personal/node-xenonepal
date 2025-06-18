@@ -10,6 +10,11 @@ const orderSchema = new mongoose.Schema({
   paymentMethod: { type: String, required: true },
   paymentScreenshot: { type: String },
   status: { type: String, default: "pending" },
+  coupon: {
+    code: { type: String },
+    discountAmount: { type: Number },
+    discountType: { type: String, enum: ["flat", "percentage"] },
+  },
   createdAt: { type: Date, default: Date.now },
 });
 

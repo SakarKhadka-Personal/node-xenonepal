@@ -65,6 +65,10 @@ app.use("/api/seo", seoRoute);
 const emailRoute = require("./src/email/email.route");
 app.use("/api/email", emailRoute);
 
+// Coupon Routes
+const couponRoute = require("./src/coupon/coupon.route");
+app.use("/api/coupons", couponRoute);
+
 //Root Route For Checking Server Status
 app.get("/", function (req, res) {
   res.send("Server Is Running Perfectly");
