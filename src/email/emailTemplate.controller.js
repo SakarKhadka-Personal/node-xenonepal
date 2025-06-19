@@ -816,6 +816,122 @@ This test email confirms your {{appName}} email system is working properly.
           "currentYear",
         ],
       },
+      {
+        type: "exclusive_coupon",
+        subject:
+          "🎉 Exclusive Coupon Just for You! - {{couponCode}} | {{appName}}",
+        htmlContent: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exclusive Coupon</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+    .content { padding: 20px; }
+    .coupon-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; text-align: center; margin: 20px 0; border: 3px dashed #fff; }
+    .coupon-code { font-size: 28px; font-weight: bold; letter-spacing: 3px; background-color: rgba(255,255,255,0.2); padding: 10px 20px; border-radius: 5px; margin: 10px 0; }
+    .discount-badge { font-size: 24px; background-color: #28a745; color: white; padding: 10px 15px; border-radius: 50px; display: inline-block; margin: 10px 0; }
+    .coupon-details { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    .footer { text-align: center; padding: 20px; color: #666; border-top: 1px solid #eee; }
+    .btn { display: inline-block; background-color: #ff6b6b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+    .gift-icon { font-size: 48px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="gift-icon">🎁</div>
+      <h1>Exclusive Coupon Just for You!</h1>
+      <p>{{appName}} has something special for you, {{customerName}}!</p>
+    </div>
+    <div class="content">
+      <p>Dear {{customerName}},</p>
+      <p>We're excited to share this exclusive coupon created especially for you! This is your personal discount that can't be found anywhere else.</p>
+      
+      <div class="coupon-box">
+        <h2>🎉 Your Exclusive Coupon</h2>
+        <div class="coupon-code">{{couponCode}}</div>        <div class="discount-badge">
+          {{discountDisplay}}
+        </div>
+        <p style="margin-top: 15px; font-size: 16px;">Use this code at checkout to get your exclusive discount!</p>
+      </div>
+      
+      <div class="coupon-details">
+        <h3>📋 Coupon Details:</h3>        <p><strong>Discount:</strong> {{discountText}}</p>
+        <p><strong>Usage Limit:</strong> {{usagePerUser}} time(s) for you personally</p>
+        <p><strong>Valid Until:</strong> {{expiryDate}}</p>
+        <p><strong>Issued Date:</strong> {{issuedDate}}</p>
+      </div>
+      
+      <p style="text-align: center; margin: 30px 0;">
+        <strong>This coupon is exclusively yours!</strong><br>
+        Don't miss out on this special offer - it's valid for a limited time only.
+      </p>
+      
+      <a href="{{websiteUrl}}" class="btn">Shop Now & Use Your Coupon</a>
+      
+      <p style="font-size: 14px; color: #666; margin-top: 20px;">
+        <strong>How to use:</strong> Simply enter the coupon code <strong>{{couponCode}}</strong> during checkout to apply your exclusive discount.
+      </p>
+    </div>
+    <div class="footer">
+      <p>Thank you for being a valued member of {{appName}}!</p>
+      <p>If you have any questions about your coupon, please contact us at {{supportEmail}}</p>
+      <p>&copy; {{currentYear}} {{appName}}. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>`,
+        textContent: `🎉 Exclusive Coupon Just for You! - {{couponCode}}
+
+Dear {{customerName}},
+
+We're excited to share this exclusive coupon created especially for you! This is your personal discount that can't be found anywhere else.
+
+YOUR EXCLUSIVE COUPON: {{couponCode}}
+
+Discount: {{discountDisplay}}
+
+Coupon Details:
+- Usage Limit: {{usagePerUser}} time(s) for you personally
+- Valid Until: {{expiryDate}}
+- Issued Date: {{issuedDate}}
+
+This coupon is exclusively yours! Don't miss out on this special offer - it's valid for a limited time only.
+
+How to use: Simply enter the coupon code {{couponCode}} during checkout to apply your exclusive discount.
+
+Visit {{websiteUrl}} to shop now and use your coupon!
+
+Thank you for being a valued member of {{appName}}!
+
+If you have any questions about your coupon, please contact us at {{supportEmail}}
+
+© {{currentYear}} {{appName}}. All rights reserved.`,
+        availableVariables: [
+          "customerName",
+          "userEmail",
+          "couponCode",
+          "discountValue",
+          "discountType",
+          "maxDiscount",
+          "discountDisplay",
+          "discountText",
+          "isPercentage",
+          "expiryDate",
+          "usageLimit",
+          "usagePerUser",
+          "issuedDate",
+          "appName",
+          "supportEmail",
+          "websiteUrl",
+          "currentYear",
+        ],
+      },
     ];
 
     // Create templates if they don't exist

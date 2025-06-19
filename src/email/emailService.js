@@ -12,6 +12,28 @@ class EmailService {
     this.templateCache = new Map();
     this.templateCacheExpiry = 300000; // 5 minutes
     this.initializeTransporter();
+    this.registerHandlebarsHelpers();
+  }
+
+  // Register Handlebars helpers for template processing
+  registerHandlebarsHelpers() {
+    // Register equality helper
+    Handlebars.registerHelper("eq", function (a, b) {
+      return a === b;
+    });
+
+    // Register if helper for better conditional logic
+    Handlebars.registerHelper("if_eq", function (a, b, options) {
+      if (a === b) {
+        return options.fn(this);
+      }
+      return options.inverse(this);
+    });
+
+    // Register currency format helper
+    Handlebars.registerHelper("currency", function (amount) {
+      return `NPR ${amount}`;
+    });
   }
 
   async loadEmailSettings() {
@@ -148,8 +170,9 @@ class EmailService {
         }
         this.templateCache.delete(cacheKey);
       }
+      const template = await EmailTemplate.findOne({ type, isActive: true });
 
-      const template = await EmailTemplate.findOne({ type, isActive: true }); // If template not found, try to auto-initialize it
+      // If template not found, try to auto-initialize it
       if (!template) {
         // Check if it's a known template type that should exist
         const knownTypes = [
@@ -160,6 +183,7 @@ class EmailService {
           "test_email",
           "admin_new_order",
           "admin_order_status_update",
+          "exclusive_coupon",
         ];
 
         if (knownTypes.includes(type)) {
@@ -395,6 +419,55 @@ class EmailService {
         userEmail: userData.email,
         registrationDate: new Date().toLocaleDateString(),
       },
+    });
+  }
+  async sendExclusiveCouponEmail(userEmail, userData, couponData) {
+    // Pre-process discount information for easier template usage
+    const isPercentage = couponData.discountType === "percentage";
+    let discountDisplay, discountText;
+
+    if (isPercentage) {
+      discountDisplay = `${couponData.discountValue}% OFF`;
+      if (couponData.maxDiscount && couponData.maxDiscount > 0) {
+        discountDisplay += ` (Max NPR ${couponData.maxDiscount})`;
+      }
+      discountText = `${couponData.discountValue}% off your purchase`;
+      if (couponData.maxDiscount && couponData.maxDiscount > 0) {
+        discountText += `. Maximum discount: NPR ${couponData.maxDiscount}`;
+      }
+    } else {
+      discountDisplay = `NPR ${couponData.discountValue} OFF`;
+      discountText = `NPR ${couponData.discountValue} off your purchase`;
+    }
+
+    const variables = {
+      customerName: userData.name || "Valued Customer",
+      userEmail: userData.email,
+      couponCode: couponData.code,
+      discountValue: couponData.discountValue,
+      discountType: couponData.discountType,
+      maxDiscount: couponData.maxDiscount,
+      discountDisplay: discountDisplay,
+      discountText: discountText,
+      isPercentage: isPercentage,
+      expiryDate: new Date(couponData.expiresAt).toLocaleDateString(),
+      usageLimit: couponData.usageLimit,
+      usagePerUser: couponData.usagePerUser,
+      issuedDate: new Date().toLocaleDateString(),
+    };
+
+    console.log("🎯 Sending exclusive coupon email with variables:", {
+      to: userEmail,
+      customerName: variables.customerName,
+      couponCode: variables.couponCode,
+      discountDisplay: variables.discountDisplay,
+      discountText: variables.discountText,
+    });
+
+    return await this.sendEmail({
+      to: userEmail,
+      templateType: "exclusive_coupon",
+      variables: variables,
     });
   }
 

@@ -13,6 +13,7 @@ const emailTemplateSchema = new mongoose.Schema(
         "test_email",
         "admin_new_order",
         "admin_order_status_update",
+        "exclusive_coupon",
       ],
       unique: true,
     },

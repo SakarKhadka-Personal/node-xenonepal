@@ -1,5 +1,7 @@
 const Coupon = require("./coupon.model");
 const Order = require("../order/order.model");
+const User = require("../user/user.model");
+const emailService = require("../email/emailService");
 
 // Create a new coupon (Admin only)
 const createCoupon = async (req, res) => {
@@ -54,8 +56,73 @@ const createCoupon = async (req, res) => {
       expiresAt: new Date(expiresAt),
       isActive: isActive !== undefined ? isActive : true,
     });
-
     await newCoupon.save();
+    console.log(`🎯 Coupon created successfully: ${newCoupon.code}`);
+    console.log(`📋 ValidFor: ${validFor}, Users: ${JSON.stringify(users)}`);
+
+    // Send email notifications for exclusive user coupons
+    if (validFor === "user" && users && users.length > 0) {
+      console.log(
+        `🎯 Attempting to send emails to ${users.length} users:`,
+        users
+      );
+      try {
+        // Get user details for email notifications using googleId instead of _id
+        const userList = await User.find({ googleId: { $in: users } });
+        console.log(`📋 Found ${userList.length} users in database`);
+
+        if (userList.length === 0) {
+          console.log(`⚠️ No users found for googleIds:`, users);
+          // Try finding by _id as fallback
+          const userListById = await User.find({ _id: { $in: users } });
+          console.log(
+            `📋 Fallback search by _id found ${userListById.length} users`
+          );
+          if (userListById.length > 0) {
+            userList.push(...userListById);
+          }
+        }
+
+        // Send email to each user
+        for (const user of userList) {
+          try {
+            console.log(`📧 Sending email to ${user.email} (${user.name})`);
+            await emailService.sendExclusiveCouponEmail(
+              user.email,
+              {
+                name: user.name,
+                email: user.email,
+              },
+              {
+                code: newCoupon.code,
+                discountType: newCoupon.discountType,
+                discountValue: newCoupon.discountValue,
+                maxDiscount: newCoupon.maxDiscount,
+                expiresAt: newCoupon.expiresAt,
+                usageLimit: newCoupon.usageLimit,
+                usagePerUser: newCoupon.usagePerUser,
+              }
+            );
+            console.log(`✅ Exclusive coupon email sent to ${user.email}`);
+          } catch (emailError) {
+            console.error(
+              `❌ Failed to send coupon email to ${user.email}:`,
+              emailError
+            );
+            // Don't fail coupon creation if email fails
+          }
+        }
+      } catch (error) {
+        console.error("Error sending coupon notification emails:", error);
+        // Don't fail coupon creation if email fails
+      }
+    } else {
+      console.log(
+        `ℹ️ No emails to send. ValidFor: ${validFor}, Users count: ${
+          users ? users.length : 0
+        }`
+      );
+    }
 
     res.status(201).json({
       success: true,
