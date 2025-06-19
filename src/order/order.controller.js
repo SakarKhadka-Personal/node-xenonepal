@@ -439,23 +439,58 @@ exports.createOrder = async (req, res) => {
 // Get all orders (admin) with pagination and filtering
 exports.getAllOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, search } = req.query;
-
-    // Build filter object
+    const { page = 1, limit = 10, status, search } = req.query; // Build filter object
     const filter = {};
     if (status) {
       filter.status = status.toLowerCase();
     }
 
+    // For searching in user information, we need to handle it differently
+    let userIds = [];
+    if (search) {
+      // First, find users that match the search term
+      try {
+        const users = await User.find({
+          $or: [
+            { name: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+          ],
+        }).select("googleId");
+        userIds = users.map((user) => user.googleId);
+      } catch (error) {
+        console.error("Error searching users:", error);
+      }
+    }
+
     // Add search functionality
     if (search) {
-      filter.$or = [
-        { _id: { $regex: search, $options: "i" } },
+      const searchConditions = [
         { "order.username": { $regex: search, $options: "i" } },
         { "order.playerID": { $regex: search, $options: "i" } },
         { "order.title": { $regex: search, $options: "i" } },
         { status: { $regex: search, $options: "i" } },
       ];
+
+      // Add user search condition if we found matching users
+      if (userIds.length > 0) {
+        searchConditions.push({ userId: { $in: userIds } });
+      }
+
+      // Try to search by ObjectId if the search term could be a valid ObjectId
+      if (search.match(/^[0-9a-fA-F]{24}$/) || search.length >= 8) {
+        // Add partial ObjectId search (convert to string first)
+        searchConditions.push({
+          $expr: {
+            $regexMatch: {
+              input: { $toString: "$_id" },
+              regex: search,
+              options: "i",
+            },
+          },
+        });
+      }
+
+      filter.$or = searchConditions;
     }
 
     // Get paginated results
@@ -504,43 +539,15 @@ exports.getAllOrders = async (req, res) => {
       })
     );
 
-    // For search, also search within user information if needed
-    let finalOrdersWithUserInfo = ordersWithUserInfo;
-    if (search && !status) {
-      // Additional filtering for user-related search terms
-      finalOrdersWithUserInfo = ordersWithUserInfo.filter((order) => {
-        const searchTerm = search.toLowerCase();
-
-        // Search in order fields
-        const orderMatch = [
-          order._id?.toString(),
-          order.order?.username,
-          order.order?.playerID,
-          order.order?.title,
-          order.status,
-        ].some((field) => field?.toLowerCase().includes(searchTerm));
-
-        // Search in user info
-        const userMatch =
-          order.userInfo &&
-          [order.userInfo.name, order.userInfo.email].some((field) =>
-            field?.toLowerCase().includes(searchTerm)
-          );
-
-        return orderMatch || userMatch;
-      });
-    }
-
-    // Get total count for pagination (without search filtering for user info)
+    // Get total count for pagination
     const total = await Order.countDocuments(filter); // Get status counts for all orders (not just filtered ones)
     const [totalDelivered, totalPending, totalCancelled] = await Promise.all([
       Order.countDocuments({ status: "delivered" }),
       Order.countDocuments({ status: "pending" }),
       Order.countDocuments({ status: "cancelled" }),
     ]);
-
     res.json({
-      orders: finalOrdersWithUserInfo,
+      orders: ordersWithUserInfo,
       totalPages: Math.ceil(total / limit),
       currentPage: page,
       total,
