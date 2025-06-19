@@ -2,9 +2,20 @@
  * SEO Indexing API Controller
  * Handles indexing requests and IndexNow API integration
  */
+const dotenv = require("dotenv");
+dotenv.config();
 
 const indexingQueue = [];
-const INDEXNOW_KEY = process.env.INDEXNOW_KEY || "your-indexnow-key-here";
+const INDEXNOW_KEY = process.env.INDEXNOW_KEY || "indexnow-key";
+
+// Log key status at startup
+console.log(
+  `IndexNow key ${
+    INDEXNOW_KEY === "indexnow-key"
+      ? "NOT FOUND (using default)"
+      : "loaded from environment"
+  }`
+);
 
 /**
  * Request immediate indexing for a URL
@@ -75,25 +86,35 @@ const processIndexingRequest = async (request) => {
  */
 const submitToGoogle = async (url) => {
   try {
-    const response = await fetch(
-      `https://api.indexnow.org/indexnow?url=${encodeURIComponent(
-        url
-      )}&key=${INDEXNOW_KEY}`,
-      {
-        method: "GET",
-        headers: {
-          "User-Agent": "XenoNepal-IndexBot/1.0",
-        },
-      }
-    );
+    console.log(`Submitting to Google IndexNow: ${url}`);
+
+    const indexNowUrl = `https://api.indexnow.org/indexnow?url=${encodeURIComponent(
+      url
+    )}&key=${INDEXNOW_KEY}`;
+    console.log(`IndexNow URL: ${indexNowUrl}`);
+
+    const response = await fetch(indexNowUrl, {
+      method: "GET",
+      headers: {
+        "User-Agent": "XenoNepal-IndexBot/1.0",
+      },
+      timeout: 10000, // 10 second timeout
+    });
 
     if (!response.ok) {
-      throw new Error(`Google IndexNow failed: ${response.status}`);
+      const responseText = await response.text();
+      console.error(
+        `Google IndexNow failed: ${response.status} - ${responseText}`
+      );
+      throw new Error(
+        `Google IndexNow failed: ${response.status} - ${responseText}`
+      );
     }
 
+    console.log(`Google IndexNow success for ${url}`);
     return true;
   } catch (error) {
-    console.error("Google IndexNow error:", error);
+    console.error("Google IndexNow error:", error.message);
     return false;
   }
 };
@@ -103,27 +124,41 @@ const submitToGoogle = async (url) => {
  */
 const submitToBing = async (url) => {
   try {
+    console.log(`Submitting to Bing IndexNow: ${url}`);
+
+    const payload = {
+      host: "xenonepal.com",
+      key: INDEXNOW_KEY,
+      keyLocation: `https://xenonepal.com/${INDEXNOW_KEY}.txt`,
+      urlList: [url],
+    };
+
+    console.log(`Bing IndexNow payload: ${JSON.stringify(payload)}`);
+
     const response = await fetch("https://api.indexnow.org/indexnow", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "User-Agent": "XenoNepal-IndexBot/1.0",
       },
-      body: JSON.stringify({
-        host: "xenonepal.com",
-        key: INDEXNOW_KEY,
-        keyLocation: `https://xenonepal.com/${INDEXNOW_KEY}.txt`,
-        urlList: [url],
-      }),
+      body: JSON.stringify(payload),
+      timeout: 10000, // 10 second timeout
     });
 
     if (!response.ok) {
-      throw new Error(`Bing IndexNow failed: ${response.status}`);
+      const responseText = await response.text();
+      console.error(
+        `Bing IndexNow failed: ${response.status} - ${responseText}`
+      );
+      throw new Error(
+        `Bing IndexNow failed: ${response.status} - ${responseText}`
+      );
     }
 
+    console.log(`Bing IndexNow success for ${url}`);
     return true;
   } catch (error) {
-    console.error("Bing IndexNow error:", error);
+    console.error("Bing IndexNow error:", error.message);
     return false;
   }
 };
@@ -225,36 +260,79 @@ const getIndexingStatus = async (req, res) => {
 const pingSitemap = async (req, res) => {
   try {
     const sitemapUrl = "https://xenonepal.com/sitemap.xml";
+    const pingResults = [];
 
-    const pingPromises = [
-      // Google
-      fetch(
-        `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`
-      ),
-      // Bing
-      fetch(
-        `https://www.bing.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`
-      ),
-      // Yahoo
-      fetch(
-        `https://search.yahooapis.com/SiteExplorerService/V1/ping?sitemap=${encodeURIComponent(
-          sitemapUrl
-        )}`
-      ),
-    ];
+    // Function to ping a search engine with proper error handling
+    async function pingSingleEngine(engineName, pingUrl) {
+      try {
+        const response = await fetch(pingUrl, {
+          method: "GET",
+          headers: {
+            "User-Agent": "XenoNepal-SitemapBot/1.0",
+          },
+          timeout: 10000, // 10 seconds timeout
+        });
 
-    const results = await Promise.allSettled(pingPromises);
-    const successCount = results.filter((r) => r.status === "fulfilled").length;
+        const result = {
+          engine: engineName,
+          status: response.status,
+          success: response.ok,
+          timestamp: new Date().toISOString(),
+        };
+
+        pingResults.push(result);
+        console.log(
+          `Sitemap ping to ${engineName}: ${response.status} ${
+            response.ok ? "OK" : "FAILED"
+          }`
+        );
+        return result;
+      } catch (error) {
+        const result = {
+          engine: engineName,
+          status: "error",
+          success: false,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        };
+
+        pingResults.push(result);
+        console.error(`Sitemap ping to ${engineName} failed:`, error.message);
+        return result;
+      }
+    }
+
+    // Ping each search engine one by one to better handle errors
+    await pingSingleEngine(
+      "Google",
+      `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`
+    );
+
+    await pingSingleEngine(
+      "Bing",
+      `https://www.bing.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`
+    );
+
+    await pingSingleEngine(
+      "Yahoo",
+      `https://search.yahooapis.com/SiteExplorerService/V1/ping?sitemap=${encodeURIComponent(
+        sitemapUrl
+      )}`
+    );
+
+    const successCount = pingResults.filter((r) => r.success).length;
 
     res.json({
-      success: true,
+      success: successCount > 0,
       message: `Sitemap pinged to ${successCount}/3 search engines`,
       sitemapUrl,
-      results: results.map((r) => ({ status: r.status })),
+      results: pingResults,
     });
   } catch (error) {
     console.error("Sitemap ping error:", error);
-    res.status(500).json({ error: "Failed to ping sitemap" });
+    res
+      .status(500)
+      .json({ error: "Failed to ping sitemap", message: error.message });
   }
 };
 

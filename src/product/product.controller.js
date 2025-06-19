@@ -88,6 +88,48 @@ const validateGameId = async (req, res) => {
 
 const postAProduct = async (req, res) => {
   try {
+    // First, validate required fields manually to provide better error messages
+    const requiredFields = [
+      "title",
+      "description",
+      "category",
+      "coverImage",
+      "placeholderUID",
+      "placeholderUsername",
+      "productQuantity",
+    ];
+    const missingFields = [];
+
+    for (const field of requiredFields) {
+      if (!req.body[field]) {
+        missingFields.push(field);
+      }
+    }
+
+    // Check if productQuantity has at least one item with quantity and price
+    if (req.body.productQuantity && req.body.productQuantity.length > 0) {
+      for (let i = 0; i < req.body.productQuantity.length; i++) {
+        const item = req.body.productQuantity[i];
+        if (!item.quantity || item.price === undefined) {
+          missingFields.push(
+            `productQuantity[${i}] requires quantity and price`
+          );
+        }
+      }
+    } else if (!missingFields.includes("productQuantity")) {
+      missingFields.push("productQuantity must have at least one item");
+    }
+
+    if (missingFields.length > 0) {
+      return res.status(400).send({
+        message: "Validation Error",
+        errors: missingFields.map((field) => ({
+          field,
+          message: `${field} is required`,
+        })),
+      });
+    }
+
     // Remove basePrice, maxPrice, and currencyName from request body if they exist
     const { basePrice, maxPrice, currencyName, currecyName, ...productData } =
       req.body;
@@ -107,20 +149,26 @@ const postAProduct = async (req, res) => {
     // Convert to object with virtuals for response
     const productWithVirtuals = newProduct.toObject({ virtuals: true });
 
-    res
-      .status(200)
-      .send({
-        message: "Product Created Successfully",
-        newProduct: productWithVirtuals,
-      });
+    res.status(200).send({
+      message: "Product Created Successfully",
+      newProduct: productWithVirtuals,
+    });
   } catch (error) {
     if (error.name === "ValidationError") {
+      // Format Mongoose validation errors in a more user-friendly way
+      const validationErrors = Object.keys(error.errors).map((field) => ({
+        field,
+        message: error.errors[field].message,
+      }));
+
       return res
         .status(400)
-        .send({ message: "Validation Error", errors: error.errors });
+        .send({ message: "Validation Error", errors: validationErrors });
     }
     console.error("Error creating product", error);
-    res.status(500).send({ message: "Failed to create product" });
+    res
+      .status(500)
+      .send({ message: "Failed to create product", error: error.message });
   }
 };
 
