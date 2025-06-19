@@ -15,18 +15,6 @@ const productSchema = new mongoose.Schema({
     required: true,
   },
 
-  basePrice: {
-    type: Number,
-    required: true,
-  },
-  maxPrice: {
-    type: Number,
-    required: true,
-  },
-  currencyName: {
-    type: String,
-    required: true,
-  },
   category: {
     type: String,
     required: true,
@@ -69,13 +57,39 @@ const productSchema = new mongoose.Schema({
         type: Number,
         required: true,
       },
+      costPrice: {
+        type: Number,
+        default: 0,
+        // This field is admin-only and should never be exposed to public APIs
+      },
     },
   ],
+  quantityInStock: {
+    type: Number,
+    default: null, // null means unlimited stock
+    required: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
+
+// Virtual field for basePrice (minimum price from productQuantity)
+productSchema.virtual("basePrice").get(function () {
+  if (!this.productQuantity || this.productQuantity.length === 0) return 0;
+  return Math.min(...this.productQuantity.map((item) => item.price));
+});
+
+// Virtual field for maxPrice (maximum price from productQuantity)
+productSchema.virtual("maxPrice").get(function () {
+  if (!this.productQuantity || this.productQuantity.length === 0) return 0;
+  return Math.max(...this.productQuantity.map((item) => item.price));
+});
+
+// Ensure virtual fields are included when converting to JSON
+productSchema.set("toJSON", { virtuals: true });
+productSchema.set("toObject", { virtuals: true });
 
 const Product = mongoose.model("Product", productSchema);
 module.exports = Product;

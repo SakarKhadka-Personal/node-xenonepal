@@ -69,6 +69,10 @@ app.use("/api/email", emailRoute);
 const couponRoute = require("./src/coupon/coupon.route");
 app.use("/api/coupons", couponRoute);
 
+// Finance Routes (Admin only)
+const financeRoute = require("./src/finance/finance.route");
+app.use("/api/admin/finance", financeRoute);
+
 //Root Route For Checking Server Status
 app.get("/", function (req, res) {
   res.send("Server Is Running Perfectly");

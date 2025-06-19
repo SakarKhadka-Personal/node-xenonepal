@@ -4,24 +4,27 @@ const {
   postAProduct,
   getAllProducts,
   getSingleProduct,
+  getAllProductsAdmin,
+  getSingleProductAdmin,
   updateProduct,
   deleteProduct,
   validateGameId,
 } = require("./product.controller");
+const { verifyAdmin } = require("../middleware/adminAuth");
 const router = express.Router();
 
-// Post A Products
-router.post("/create-product", postAProduct);
-
+// Public routes (without cost data)
 router.get("/", getAllProducts);
-
 router.get("/:id", getSingleProduct);
-
-router.put("/edit/:id", updateProduct);
-
-router.delete("/delete/:id", deleteProduct);
 
 // Game ID validation route
 router.post("/validate-game-id", validateGameId);
+
+// Admin-only routes (with cost data)
+router.get("/admin/all", verifyAdmin, getAllProductsAdmin);
+router.get("/admin/:id", verifyAdmin, getSingleProductAdmin);
+router.post("/create-product", verifyAdmin, postAProduct);
+router.put("/edit/:id", verifyAdmin, updateProduct);
+router.delete("/delete/:id", verifyAdmin, deleteProduct);
 
 module.exports = router;

@@ -1,8 +1,246 @@
 const Order = require("./order.model");
 const User = require("../user/user.model");
+const Product = require("../product/product.model");
 const Coupon = require("../coupon/coupon.model");
 const emailService = require("../email/emailService");
 const { awardXenoCoins } = require("../user/user.controller");
+const ManualEntry = require("../finance/manualEntry.model");
+
+// Helper function to calculate profit data for an order
+const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
+  try {
+    console.log("🔍 Debug: calculateOrderProfitData called with:", {
+      orderItems,
+      couponDiscount,
+    });
+
+    let totalCost = 0;
+    let totalRevenue = 0;
+    const itemProfits = [];
+
+    // Handle different order data structures
+    let items = [];
+    if (Array.isArray(orderItems)) {
+      items = orderItems;
+    } else if (orderItems.productId) {
+      // Single item order with productId
+      items = [orderItems];
+    } else if (orderItems.title && orderItems.price) {
+      // Handle the current order structure: single order object without productId
+      console.log("🔍 Processing single order without productId:", orderItems);
+
+      // Extract quantity number from string like "322 (x 1)" or just use 1
+      let quantity = 1;
+      if (orderItems.quantity && typeof orderItems.quantity === "string") {
+        const match = orderItems.quantity.match(/\d+/);
+        if (match) {
+          quantity = parseInt(match[0]);
+        }
+      } else if (typeof orderItems.quantity === "number") {
+        quantity = orderItems.quantity;
+      }
+
+      const sellingPrice = orderItems.price || 0;
+
+      // Try to find the product by title to get cost price
+      let costPrice = 0;
+      try {
+        console.log(
+          `🔍 Searching for product with title: "${orderItems.title}" and price: ${sellingPrice}`
+        );
+
+        const product = await Product.findOne({
+          title: { $regex: new RegExp(orderItems.title.trim(), "i") }, // Case-insensitive search
+        });
+
+        if (
+          product &&
+          product.productQuantity &&
+          product.productQuantity.length > 0
+        ) {
+          console.log(
+            `✅ Found product: ${product.title} with ${product.productQuantity.length} quantity options`
+          );
+
+          // Try to match by price first, then by quantity
+          const matchingQty =
+            product.productQuantity.find((pq) => pq.price === sellingPrice) ||
+            product.productQuantity.find(
+              (pq) => pq.quantity === quantity.toString()
+            ) ||
+            product.productQuantity.find(
+              (pq) => parseInt(pq.quantity) === quantity
+            );
+
+          if (matchingQty && matchingQty.costPrice) {
+            costPrice = matchingQty.costPrice;
+            console.log(
+              `✅ Found matching cost price: ${costPrice} for price: ${sellingPrice}, quantity: ${quantity}`
+            );
+          } else {
+            console.warn(
+              `⚠️ No matching cost price found for price: ${sellingPrice}, quantity: ${quantity}`
+            );
+            console.log(
+              "Available options:",
+              product.productQuantity.map((pq) => ({
+                quantity: pq.quantity,
+                price: pq.price,
+                costPrice: pq.costPrice,
+              }))
+            );
+          }
+        } else {
+          console.warn(`⚠️ Product not found for title: "${orderItems.title}"`);
+        }
+      } catch (productError) {
+        console.error(
+          "Error finding product for cost calculation:",
+          productError
+        );
+      }
+
+      const itemRevenue = sellingPrice * quantity;
+      const itemCost = costPrice * quantity;
+      const itemProfit = itemRevenue - itemCost;
+
+      totalRevenue += itemRevenue;
+      totalCost += itemCost;
+
+      itemProfits.push({
+        title: orderItems.title,
+        quantity,
+        sellingPrice,
+        costPrice,
+        profit: itemProfit,
+      });
+
+      console.log("✅ Processed order:", {
+        quantity,
+        sellingPrice,
+        costPrice,
+        itemRevenue,
+        itemCost,
+        itemProfit,
+      });
+
+      // Apply coupon discount to revenue
+      const finalRevenue = Math.max(0, totalRevenue - couponDiscount);
+      const totalProfit = finalRevenue - totalCost;
+
+      return {
+        totalCost,
+        totalRevenue: finalRevenue,
+        totalProfit,
+        itemProfits,
+      };
+    } else {
+      console.warn(
+        "Unable to parse order items for profit calculation:",
+        orderItems
+      );
+      return null;
+    }
+
+    // Process items with productId (for future compatibility)
+    for (const item of items) {
+      try {
+        const product = await Product.findById(item.productId);
+        if (!product) {
+          console.warn(
+            `Product not found for profit calculation: ${item.productId}`
+          );
+          continue;
+        }
+
+        const quantity = item.quantity || 1;
+        const sellingPrice = item.price || item.totalPrice || 0;
+
+        // Find matching product quantity to get cost price
+        let costPrice = 0;
+        if (product.productQuantity && product.productQuantity.length > 0) {
+          const matchingQty = product.productQuantity.find(
+            (pq) =>
+              pq.quantity === item.selectedQuantity || pq.price === sellingPrice
+          );
+          costPrice = matchingQty?.costPrice || 0;
+        }
+
+        const itemRevenue = sellingPrice * quantity;
+        const itemCost = costPrice * quantity;
+        const itemProfit = itemRevenue - itemCost;
+
+        totalRevenue += itemRevenue;
+        totalCost += itemCost;
+
+        itemProfits.push({
+          productId: item.productId,
+          quantity,
+          sellingPrice,
+          costPrice,
+          profit: itemProfit,
+        });
+      } catch (itemError) {
+        console.error(
+          `Error calculating profit for item ${item.productId}:`,
+          itemError
+        );
+      }
+    }
+
+    // Apply coupon discount to revenue
+    const finalRevenue = Math.max(0, totalRevenue - couponDiscount);
+    const totalProfit = finalRevenue - totalCost;
+
+    return {
+      totalCost,
+      totalRevenue: finalRevenue,
+      totalProfit,
+      itemProfits,
+    };
+  } catch (error) {
+    console.error("Error calculating order profit data:", error);
+    return null;
+  }
+};
+
+// Helper function to recalculate profit data for orders missing it
+const recalculateProfitForOrder = async (orderId) => {
+  try {
+    const order = await Order.findById(orderId);
+    if (!order) {
+      console.log(`Order ${orderId} not found`);
+      return false;
+    }
+
+    if (order.profitData) {
+      console.log(`Order ${orderId} already has profit data`);
+      return true;
+    }
+
+    // Calculate profit data
+    const couponDiscount = order.coupon?.discountAmount || 0;
+    const profitData = await calculateOrderProfitData(
+      order.order,
+      couponDiscount
+    );
+
+    if (profitData) {
+      order.profitData = profitData;
+      await order.save();
+      console.log(
+        `✅ Successfully recalculated profit data for order ${orderId}`
+      );
+      return true;
+    } else {
+      console.log(`❌ Failed to calculate profit data for order ${orderId}`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`Error recalculating profit for order ${orderId}:`, error);
+    return false;
+  }
+};
 
 // Create a new order
 exports.createOrder = async (req, res) => {
@@ -19,15 +257,34 @@ exports.createOrder = async (req, res) => {
     };
 
     // Add coupon information if provided
+    let couponDiscountAmount = 0;
     if (coupon && coupon.code) {
       orderData.coupon = {
         code: coupon.code,
         discountAmount: coupon.discountAmount,
         discountType: coupon.discountType,
       };
+      couponDiscountAmount = coupon.discountAmount || 0;
+    } // Calculate profit data for this order
+    const profitData = await calculateOrderProfitData(
+      order,
+      couponDiscountAmount
+    );
+    if (profitData) {
+      orderData.profitData = profitData;
+      console.log("✅ Profit data calculated for new order:", profitData);
+    } else {
+      console.warn("⚠️ Failed to calculate profit data for new order");
     }
 
-    const newOrder = await Order.create(orderData); // Record coupon usage AFTER order creation
+    const newOrder = await Order.create(orderData);
+
+    console.log("📦 New order created:", {
+      id: newOrder._id,
+      status: newOrder.status,
+      hasProfitData: !!newOrder.profitData,
+      orderData: order,
+    }); // Record coupon usage AFTER order creation
     if (coupon && coupon.code) {
       try {
         // Record coupon usage directly in database
@@ -288,18 +545,34 @@ exports.updateOrderStatus = async (req, res) => {
       return res.status(400).json({ error: "Invalid status value" });
     }
 
-    // Update the order status
-    const updatedOrder = await Order.findByIdAndUpdate(
-      id,
-      { status: status.toLowerCase() },
-      { new: true }
-    );
-
-    if (!updatedOrder) {
+    // Get the current order
+    const currentOrder = await Order.findById(id);
+    if (!currentOrder) {
       return res.status(404).json({ error: "Order not found" });
     }
 
-    // Send response immediately for better performance
+    // If marking as delivered and no profit data exists, calculate it now
+    if (status.toLowerCase() === "delivered" && !currentOrder.profitData) {
+      console.log(
+        `🔄 Calculating profit data for order ${id} before marking as delivered`
+      );
+      const couponDiscount = currentOrder.coupon?.discountAmount || 0;
+      const profitData = await calculateOrderProfitData(
+        currentOrder.order,
+        couponDiscount
+      );
+
+      if (profitData) {
+        currentOrder.profitData = profitData;
+        console.log(`✅ Profit data calculated for order ${id}:`, profitData);
+      } else {
+        console.warn(`⚠️ Failed to calculate profit data for order ${id}`);
+      }
+    }
+
+    // Update the order status
+    currentOrder.status = status.toLowerCase();
+    const updatedOrder = await currentOrder.save(); // Send response immediately for better performance
     res.json({
       message: "Order status updated successfully",
       order: updatedOrder,
@@ -307,6 +580,19 @@ exports.updateOrderStatus = async (req, res) => {
     setImmediate(async () => {
       try {
         const user = await User.findOne({ googleId: updatedOrder.userId });
+
+        // Add order profit to transaction history when delivered
+        if (
+          status.toLowerCase() === "delivered" &&
+          updatedOrder.profitData &&
+          updatedOrder.profitData.totalProfit > 0
+        ) {
+          console.log(
+            `Adding profit of ${updatedOrder.profitData.totalProfit} to transaction history for order ${updatedOrder._id}`
+          );
+          await addOrderProfitToTransactions(updatedOrder, updatedOrder.userId);
+        }
+
         if (user && user.email) {
           // Award XenoCoins for delivered orders
           if (status.toLowerCase() === "delivered") {
@@ -394,5 +680,75 @@ exports.deleteOrder = async (req, res) => {
     res.json({ message: "Order deleted successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+// Debug endpoint to check orders and profit data
+exports.debugOrders = async (req, res) => {
+  try {
+    const recentOrders = await Order.find().sort({ createdAt: -1 }).limit(10);
+
+    const orderDebugInfo = recentOrders.map((order) => ({
+      id: order._id,
+      status: order.status,
+      createdAt: order.createdAt,
+      hasProfitData: !!order.profitData,
+      profitData: order.profitData,
+      orderData: order.order,
+    }));
+
+    res.json({
+      totalOrders: await Order.countDocuments(),
+      deliveredOrders: await Order.countDocuments({ status: "delivered" }),
+      pendingOrders: await Order.countDocuments({ status: "pending" }),
+      ordersWithProfit: await Order.countDocuments({
+        profitData: { $exists: true },
+      }),
+      recentOrders: orderDebugInfo,
+    });
+  } catch (error) {
+    console.error("Debug orders error:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Helper function to add order profit to transaction history
+const addOrderProfitToTransactions = async (order, userId) => {
+  try {
+    if (!order.profitData || !order.profitData.totalProfit) {
+      console.warn(`No profit data available for order ${order._id}`);
+      return null;
+    }
+
+    // Create a manual income entry for the profit
+    const profit = order.profitData.totalProfit;
+    const productTitle = order.order.title || "Product";
+    const sellingPrice = order.order.price || 0;
+    const costPrice = order.profitData.totalCost || 0;
+    const orderId = order._id.toString().slice(-6);
+
+    const description = `Profit from order: ${productTitle} (ID: ${orderId}) - Selling: ${sellingPrice}, Cost: ${costPrice}`;
+
+    const manualEntry = new ManualEntry({
+      type: "income",
+      description,
+      amount: profit,
+      category: "order-profit", // Specific category for order profits
+      date: new Date(),
+      createdBy: userId || "system",
+    });
+
+    await manualEntry.save();
+    console.log(
+      `✅ Added profit of ${profit} to transaction history for order ${order._id}`
+    );
+
+    return manualEntry;
+  } catch (error) {
+    console.error(
+      `Error adding profit to transaction history for order ${order._id}:`,
+      error
+    );
+    return null;
   }
 };

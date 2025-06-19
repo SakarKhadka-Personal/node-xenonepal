@@ -88,11 +88,31 @@ const validateGameId = async (req, res) => {
 
 const postAProduct = async (req, res) => {
   try {
-    const newProduct = new Product({ ...req.body });
+    // Remove basePrice, maxPrice, and currencyName from request body if they exist
+    const { basePrice, maxPrice, currencyName, currecyName, ...productData } =
+      req.body;
+
+    // Handle quantityInStock - convert empty string to null for unlimited stock
+    if (
+      productData.quantityInStock === "" ||
+      productData.quantityInStock === undefined
+    ) {
+      productData.quantityInStock = null;
+    }
+
+    // Ensure virtual fields are included in response by explicitly converting to object with virtuals
+    const newProduct = new Product(productData);
     await newProduct.save();
+
+    // Convert to object with virtuals for response
+    const productWithVirtuals = newProduct.toObject({ virtuals: true });
+
     res
       .status(200)
-      .send({ message: "Product Created Successfully", newProduct });
+      .send({
+        message: "Product Created Successfully",
+        newProduct: productWithVirtuals,
+      });
   } catch (error) {
     if (error.name === "ValidationError") {
       return res
@@ -104,20 +124,28 @@ const postAProduct = async (req, res) => {
   }
 };
 
-// Get All Products
+// Get All Products (Public - without cost data)
 const getAllProducts = async (req, res) => {
   try {
     const products = await Product.find().sort({ createdAt: -1 });
-    res
-      .status(200)
-      .send({ message: "Products fetched successfully", products });
+    // Convert to objects with virtuals and then sanitize
+    const productsWithVirtuals = products.map((product) =>
+      product.toObject({ virtuals: true })
+    );
+    const sanitizedProducts = productsWithVirtuals.map(
+      sanitizeProductForPublic
+    );
+    res.status(200).send({
+      message: "Products fetched successfully",
+      products: sanitizedProducts,
+    });
   } catch (error) {
     console.error("Error fetching products", error);
     res.status(500).send({ message: "Failed to fetch products from db" });
   }
 };
 
-// Get Single Product
+// Get Single Product (Public - without cost data)
 const getSingleProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -126,10 +154,17 @@ const getSingleProduct = async (req, res) => {
     if (!product) {
       return res.status(404).send({ message: "Product Not Found" });
     }
-    res.status(200).send({ message: "Product fetched successfully", product });
+
+    // Convert to object with virtuals and then sanitize
+    const productWithVirtuals = product.toObject({ virtuals: true });
+    const sanitizedProduct = sanitizeProductForPublic(productWithVirtuals);
+    res.status(200).send({
+      message: "Product fetched successfully",
+      product: sanitizedProduct,
+    });
   } catch (error) {
     console.error("Error fetching product", error);
-    res.status(500).send({ message: "Failed to fetch product    " });
+    res.status(500).send({ message: "Failed to fetch product" });
   }
 };
 
@@ -137,7 +172,20 @@ const getSingleProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const updatedProduct = await Product.findByIdAndUpdate(id, req.body, {
+
+    // Remove basePrice, maxPrice, and currencyName from request body if they exist
+    const { basePrice, maxPrice, currencyName, currecyName, ...productData } =
+      req.body;
+
+    // Handle quantityInStock - convert empty string to null for unlimited stock
+    if (
+      productData.quantityInStock === "" ||
+      productData.quantityInStock === undefined
+    ) {
+      productData.quantityInStock = null;
+    }
+
+    const updatedProduct = await Product.findByIdAndUpdate(id, productData, {
       new: true,
     });
 
@@ -145,9 +193,12 @@ const updateProduct = async (req, res) => {
       return res.status(404).send({ message: "Product Not Found" });
     }
 
+    // Convert to object with virtuals for response
+    const productWithVirtuals = updatedProduct.toObject({ virtuals: true });
+
     res.status(200).send({
       message: "Product Updated Successfully",
-      product: updatedProduct,
+      product: productWithVirtuals,
     });
   } catch (error) {
     console.error("Error Updating product", error);
@@ -175,6 +226,70 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+// Helper function to remove sensitive data for public APIs
+const sanitizeProductForPublic = (product) => {
+  // Ensure we're working with a plain object
+  const sanitized = product.toObject
+    ? product.toObject({ virtuals: true })
+    : product;
+
+  // Remove cost price from product quantities
+  if (sanitized.productQuantity) {
+    sanitized.productQuantity = sanitized.productQuantity.map((qty) => {
+      const { costPrice, ...publicQty } = qty;
+      return publicQty;
+    });
+  }
+
+  // Remove quantityInStock for public APIs (keep it hidden from customers)
+  // But keep it for admin APIs
+  if (sanitized.quantityInStock !== undefined) {
+    delete sanitized.quantityInStock;
+  }
+
+  return sanitized;
+};
+
+// Admin-only: Get All Products with cost data
+const getAllProductsAdmin = async (req, res) => {
+  try {
+    const products = await Product.find().sort({ createdAt: -1 });
+    // Convert to objects with virtuals for admin view
+    const productsWithVirtuals = products.map((product) =>
+      product.toObject({ virtuals: true })
+    );
+    res.status(200).send({
+      message: "Products fetched successfully",
+      products: productsWithVirtuals,
+    });
+  } catch (error) {
+    console.error("Error fetching products", error);
+    res.status(500).send({ message: "Failed to fetch products from db" });
+  }
+};
+
+// Admin-only: Get Single Product with cost data
+const getSingleProductAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = await Product.findById(id);
+
+    if (!product) {
+      return res.status(404).send({ message: "Product Not Found" });
+    }
+
+    // Convert to object with virtuals for admin view
+    const productWithVirtuals = product.toObject({ virtuals: true });
+    res.status(200).send({
+      message: "Product fetched successfully",
+      product: productWithVirtuals,
+    });
+  } catch (error) {
+    console.error("Error fetching product", error);
+    res.status(500).send({ message: "Failed to fetch product" });
+  }
+};
+
 module.exports = {
   postAProduct,
   getAllProducts,
@@ -182,4 +297,6 @@ module.exports = {
   updateProduct,
   deleteProduct,
   validateGameId,
+  getAllProductsAdmin,
+  getSingleProductAdmin,
 };

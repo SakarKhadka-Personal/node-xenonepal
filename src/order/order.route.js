@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const orderController = require("./order.controller");
+const { verifyAdmin } = require("../middleware/adminAuth");
 
 // POST /api/orders - create order
 router.post("/", orderController.createOrder);
@@ -16,5 +17,8 @@ router.patch("/:id/status", orderController.updateOrderStatus);
 
 // DELETE /api/orders/:id - delete order
 router.delete("/:id", orderController.deleteOrder);
+
+// Debug endpoint for checking order data
+router.get("/debug/orders", verifyAdmin, orderController.debugOrders);
 
 module.exports = router;
