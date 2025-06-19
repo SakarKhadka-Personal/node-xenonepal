@@ -20,13 +20,10 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
     if (Array.isArray(orderItems)) {
       items = orderItems;
     } else if (orderItems.productId) {
-      // Single item order with productId
       items = [orderItems];
     } else if (orderItems.title && orderItems.price) {
-      // Handle the current order structure: single order object without productId
       console.log("🔍 Processing single order without productId:", orderItems);
 
-      // Extract quantity number from string like "322 (x 1)" or just use 1
       let quantity = 1;
       if (orderItems.quantity && typeof orderItems.quantity === "string") {
         const match = orderItems.quantity.match(/\d+/);
@@ -36,17 +33,13 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
       } else if (typeof orderItems.quantity === "number") {
         quantity = orderItems.quantity;
       }
+
       const sellingPrice = orderItems.price || 0;
-
-      // Try to find the product by title to get cost price
       let costPrice = 0;
-      try {
-        console.log(
-          `🔍 Searching for product with title: "${orderItems.title}" and price: ${sellingPrice}`
-        );
 
+      try {
         const product = await Product.findOne({
-          title: { $regex: new RegExp(orderItems.title.trim(), "i") }, // Case-insensitive search
+          title: { $regex: new RegExp(orderItems.title.trim(), "i") },
         });
 
         if (
@@ -54,37 +47,27 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
           product.productQuantity &&
           product.productQuantity.length > 0
         ) {
-          console.log(
-            `✅ Found product: ${product.title} with ${product.productQuantity.length} quantity options`
-          );
+          const sellingPriceAlt = orderItems.originalPrice || sellingPrice;
 
-          // Try to match by price first, then by quantity
           const matchingQty =
             product.productQuantity.find((pq) => pq.price === sellingPrice) ||
+            product.productQuantity.find(
+              (pq) => pq.price === sellingPriceAlt
+            ) ||
             product.productQuantity.find(
               (pq) => pq.quantity === quantity.toString()
             ) ||
             product.productQuantity.find(
               (pq) => parseInt(pq.quantity) === quantity
+            ) ||
+            product.productQuantity.find(
+              (pq) => pq.quantity.toString() === orderItems.stack
             );
 
           if (matchingQty && matchingQty.costPrice) {
             costPrice = matchingQty.costPrice;
-            console.log(
-              `✅ Found matching cost price: ${costPrice} for price: ${sellingPrice}, quantity: ${quantity}`
-            );
           } else {
-            console.warn(
-              `⚠️ No matching cost price found for price: ${sellingPrice}, quantity: ${quantity}`
-            );
-            console.log(
-              "Available options:",
-              product.productQuantity.map((pq) => ({
-                quantity: pq.quantity,
-                price: pq.price,
-                costPrice: pq.costPrice,
-              }))
-            );
+            console.warn("⚠️ No matching cost price found");
           }
         } else {
           console.warn(`⚠️ Product not found for title: "${orderItems.title}"`);
@@ -95,38 +78,34 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
           productError
         );
       }
+      const originalPrice = orderItems.originalPrice || sellingPrice;
+      // IMPORTANT: sellingPrice is already the TOTAL PRICE, not unit price
+      // Apply coupon discount to the total price
+      const finalPrice = Math.max(0, sellingPrice - couponDiscount);
 
-      const itemRevenue = sellingPrice * quantity;
+      // ❌ OLD (WRONG): const itemRevenue = finalPrice * quantity;
+      // ✅ NEW (CORRECT): finalPrice is already the total price
+      const itemRevenue = finalPrice; // finalPrice is already total price
+
+      // For cost calculation, we need unit cost price × quantity
       const itemCost = costPrice * quantity;
-      const itemProfit = itemRevenue - itemCost;
-
       totalRevenue += itemRevenue;
       totalCost += itemCost;
+      const totalProfit = itemRevenue - itemCost;
 
       itemProfits.push({
         title: orderItems.title,
         quantity,
-        sellingPrice,
+        sellingPrice: finalPrice,
+        originalPrice,
         costPrice,
-        profit: itemProfit,
+        revenue: itemRevenue,
+        profit: totalProfit,
       });
-
-      console.log("✅ Processed order:", {
-        quantity,
-        sellingPrice,
-        costPrice,
-        itemRevenue,
-        itemCost,
-        itemProfit,
-      });
-
-      // Apply coupon discount to revenue
-      const finalRevenue = Math.max(0, totalRevenue - couponDiscount);
-      const totalProfit = finalRevenue - totalCost;
 
       return {
         totalCost,
-        totalRevenue: finalRevenue,
+        totalRevenue: itemRevenue, // ✅ FIXED: use itemRevenue instead of finalPrice
         totalProfit,
         itemProfits,
       };
@@ -138,21 +117,15 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
       return null;
     }
 
-    // Process items with productId (for future compatibility)
+    // Process multiple items (with productId)
     for (const item of items) {
       try {
         const product = await Product.findById(item.productId);
-        if (!product) {
-          console.warn(
-            `Product not found for profit calculation: ${item.productId}`
-          );
-          continue;
-        }
+        if (!product) continue;
 
         const quantity = item.quantity || 1;
         const sellingPrice = item.price || item.totalPrice || 0;
 
-        // Find matching product quantity to get cost price
         let costPrice = 0;
         if (product.productQuantity && product.productQuantity.length > 0) {
           const matchingQty = product.productQuantity.find(
@@ -162,11 +135,9 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
           costPrice = matchingQty?.costPrice || 0;
         }
 
-        const itemRevenue = sellingPrice * quantity;
+        const itemOriginalRevenue = sellingPrice * quantity;
         const itemCost = costPrice * quantity;
-        const itemProfit = itemRevenue - itemCost;
-
-        totalRevenue += itemRevenue;
+        totalRevenue += itemOriginalRevenue;
         totalCost += itemCost;
 
         itemProfits.push({
@@ -174,7 +145,8 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
           quantity,
           sellingPrice,
           costPrice,
-          profit: itemProfit,
+          originalRevenue: itemOriginalRevenue,
+          profit: 0,
         });
       } catch (itemError) {
         console.error(
@@ -184,9 +156,30 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
       }
     }
 
-    // Apply coupon discount to revenue
     const finalRevenue = Math.max(0, totalRevenue - couponDiscount);
     const totalProfit = finalRevenue - totalCost;
+
+    if (itemProfits.length > 0) {
+      for (let i = 0; i < itemProfits.length; i++) {
+        const item = itemProfits[i];
+        const originalRevenue =
+          item.originalRevenue || item.sellingPrice * item.quantity;
+
+        const revenueProportion = originalRevenue / totalRevenue;
+        let itemRevenueAfterDiscount =
+          couponDiscount > 0
+            ? Math.max(0, originalRevenue - couponDiscount * revenueProportion)
+            : originalRevenue;
+
+        const itemProfit =
+          itemRevenueAfterDiscount - item.costPrice * item.quantity;
+
+        itemProfits[i].revenue = itemRevenueAfterDiscount;
+        itemProfits[i].profit = itemProfit;
+
+        delete itemProfits[i].originalRevenue;
+      }
+    }
 
     return {
       totalCost,

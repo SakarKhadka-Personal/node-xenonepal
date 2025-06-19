@@ -60,16 +60,21 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
         ) {
           console.log(
             `✅ Found product: ${product.title} with ${product.productQuantity.length} quantity options`
-          );
-
-          // Try to match by price first, then by quantity
+          ); // Try to match by price first (try both original price and current price), then by quantity
+          const sellingPriceAlt = orderItems.originalPrice || sellingPrice;
           const matchingQty =
             product.productQuantity.find((pq) => pq.price === sellingPrice) ||
+            product.productQuantity.find(
+              (pq) => pq.price === sellingPriceAlt
+            ) ||
             product.productQuantity.find(
               (pq) => pq.quantity === quantity.toString()
             ) ||
             product.productQuantity.find(
               (pq) => parseInt(pq.quantity) === quantity
+            ) ||
+            product.productQuantity.find(
+              (pq) => pq.quantity.toString() === orderItems.stack
             );
 
           if (matchingQty && matchingQty.costPrice) {
@@ -98,39 +103,54 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
           "Error finding product for cost calculation:",
           productError
         );
-      }
+      } // IMPORTANT: orderItems.price is already the TOTAL PRICE (unit price × quantity)
+      // So we should NOT multiply by quantity again
+      const originalPrice = orderItems.originalPrice || sellingPrice;
+      const finalPrice = sellingPrice; // This is already the total price
 
-      const itemRevenue = sellingPrice * quantity;
+      // Calculate the revenue correctly: Revenue = Final Price (already total)
+      // ❌ OLD (WRONG): const itemRevenue = finalPrice * quantity;
+      // ✅ NEW (CORRECT): const itemRevenue = finalPrice;
+      const itemRevenue = finalPrice; // finalPrice is already total price
+
+      // For cost calculation, we need to find the unit cost price and multiply by quantity
       const itemCost = costPrice * quantity;
-      const itemProfit = itemRevenue - itemCost;
 
+      // The total revenue is the final revenue (no need to subtract discount again)
       totalRevenue += itemRevenue;
       totalCost += itemCost;
+
+      // Net Profit = Revenue - Cost Price
+      const totalProfit = totalRevenue - totalCost;
 
       itemProfits.push({
         title: orderItems.title,
         quantity,
-        sellingPrice,
+        sellingPrice: finalPrice,
+        originalPrice,
         costPrice,
-        profit: itemProfit,
+        revenue: totalRevenue, // Final revenue (already after discount)
+        profit: totalProfit, // Total profit
       });
-
       console.log("✅ Processed order:", {
         quantity,
-        sellingPrice,
-        costPrice,
-        itemRevenue,
-        itemCost,
-        itemProfit,
-      });
-
-      // Apply coupon discount to revenue
-      const finalRevenue = Math.max(0, totalRevenue - couponDiscount);
-      const totalProfit = finalRevenue - totalCost;
+        originalPrice,
+        finalPrice: finalPrice + " (TOTAL price, not unit price)",
+        costPrice: costPrice + " (unit cost price)",
+        couponDiscount,
+        revenue: totalRevenue + " (= finalPrice, not finalPrice × quantity)",
+        itemCost: itemCost + " (= costPrice × quantity)",
+        totalProfit,
+        profitMargin:
+          totalRevenue > 0
+            ? ((totalProfit / totalRevenue) * 100).toFixed(2) + "%"
+            : "0%",
+      }); // Calculate the final profit
+      // totalProfit is already calculated above
 
       return {
         totalCost,
-        totalRevenue: finalRevenue,
+        totalRevenue: totalRevenue,
         totalProfit,
         itemProfits,
       };
@@ -164,21 +184,22 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
               pq.quantity === item.selectedQuantity || pq.price === sellingPrice
           );
           costPrice = matchingQty?.costPrice || 0;
-        }
-
+        } // Calculate item revenue and cost
         const itemRevenue = sellingPrice * quantity;
         const itemCost = costPrice * quantity;
-        const itemProfit = itemRevenue - itemCost;
 
+        // Add to totals
         totalRevenue += itemRevenue;
         totalCost += itemCost;
 
+        // Store the original calculation for now, will be updated after all items are processed
         itemProfits.push({
           productId: item.productId,
           quantity,
           sellingPrice,
           costPrice,
-          profit: itemProfit,
+          originalRevenue: itemRevenue,
+          profit: 0, // Will be calculated after coupon is applied
         });
       } catch (itemError) {
         console.error(
@@ -186,10 +207,38 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
           itemError
         );
       }
+    } // Apply coupon discount to revenue and recalculate profits
+    const finalRevenue = Math.max(0, totalRevenue - couponDiscount);
+
+    // If there are multiple items, distribute the discount proportionally
+    if (itemProfits.length > 0) {
+      for (let i = 0; i < itemProfits.length; i++) {
+        const item = itemProfits[i];
+        const originalRevenue =
+          item.originalRevenue || item.sellingPrice * item.quantity;
+
+        // Calculate the proportion of the total revenue this item represents
+        const revenueProportion = originalRevenue / totalRevenue;
+
+        // Apply that proportion of the discount to this item
+        const itemRevenueAfterDiscount =
+          couponDiscount > 0
+            ? revenueProportion * finalRevenue
+            : originalRevenue;
+
+        // Update the item profit calculation
+        const itemProfit =
+          itemRevenueAfterDiscount - item.costPrice * item.quantity;
+
+        // Update the item profit in the array
+        itemProfits[i].revenue = itemRevenueAfterDiscount;
+        itemProfits[i].profit = itemProfit;
+
+        // Remove the temporary originalRevenue property
+        delete itemProfits[i].originalRevenue;
+      }
     }
 
-    // Apply coupon discount to revenue
-    const finalRevenue = Math.max(0, totalRevenue - couponDiscount);
     const totalProfit = finalRevenue - totalCost;
 
     return {
