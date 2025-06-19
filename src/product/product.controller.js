@@ -46,12 +46,8 @@ const validateGameId = async (req, res) => {
     }
   } catch (error) {
     console.error("❌ Error validating game ID:", error.message);
-
     if (error.response) {
       // The request was made and the server responded with a status code
-      console.log("API Response Status:", error.response.status);
-      console.log("API Response Data:", error.response.data);
-
       if (error.response.status === 404) {
         return res.status(404).json({
           success: false,
@@ -70,14 +66,12 @@ const validateGameId = async (req, res) => {
       }
     } else if (error.request) {
       // The request was made but no response was received
-      console.log("No response received from API");
       return res.status(500).json({
         success: false,
         message: "No response from game ID validation service",
       });
     } else {
       // Something happened in setting up the request
-      console.log("Request setup error:", error.message);
       return res.status(500).json({
         success: false,
         message: "Failed to validate game ID",
@@ -133,6 +127,13 @@ const postAProduct = async (req, res) => {
     // Remove basePrice, maxPrice, and currencyName from request body if they exist
     const { basePrice, maxPrice, currencyName, currecyName, ...productData } =
       req.body;
+
+    // Auto-set isLoginRequired to false for subscription, giftcard, and voucher categories
+    if (
+      ["subscription", "giftcard", "voucher"].includes(productData.category)
+    ) {
+      productData.isLoginRequired = false;
+    }
 
     // Handle quantityInStock - convert empty string to null for unlimited stock
     if (
@@ -219,11 +220,16 @@ const getSingleProduct = async (req, res) => {
 // Edit Product
 const updateProduct = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    // Remove basePrice, maxPrice, and currencyName from request body if they exist
+    const { id } = req.params; // Remove basePrice, maxPrice, and currencyName from request body if they exist
     const { basePrice, maxPrice, currencyName, currecyName, ...productData } =
       req.body;
+
+    // Auto-set isLoginRequired to false for subscription, giftcard, and voucher categories
+    if (
+      ["subscription", "giftcard", "voucher"].includes(productData.category)
+    ) {
+      productData.isLoginRequired = false;
+    }
 
     // Handle quantityInStock - convert empty string to null for unlimited stock
     if (

@@ -91,5 +91,25 @@ productSchema.virtual("maxPrice").get(function () {
 productSchema.set("toJSON", { virtuals: true });
 productSchema.set("toObject", { virtuals: true });
 
+// Pre-save middleware to automatically set isLoginRequired to false for specific categories
+productSchema.pre("save", function (next) {
+  if (["subscription", "giftcard", "voucher"].includes(this.category)) {
+    this.isLoginRequired = false;
+  }
+  next();
+});
+
+// Pre-update middleware for findOneAndUpdate operations
+productSchema.pre("findOneAndUpdate", function (next) {
+  const update = this.getUpdate();
+  if (
+    update.category &&
+    ["subscription", "giftcard", "voucher"].includes(update.category)
+  ) {
+    update.isLoginRequired = false;
+  }
+  next();
+});
+
 const Product = mongoose.model("Product", productSchema);
 module.exports = Product;

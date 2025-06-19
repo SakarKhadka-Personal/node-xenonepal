@@ -9,11 +9,6 @@ const ManualEntry = require("../finance/manualEntry.model");
 // Helper function to calculate profit data for an order
 const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
   try {
-    console.log("🔍 Debug: calculateOrderProfitData called with:", {
-      orderItems,
-      couponDiscount,
-    });
-
     let totalCost = 0;
     let totalRevenue = 0;
     const itemProfits = [];
@@ -27,7 +22,6 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
       items = [orderItems];
     } else if (orderItems.title && orderItems.price) {
       // Handle the current order structure: single order object without productId
-      console.log("🔍 Processing single order without productId:", orderItems);
 
       // Extract quantity number from string like "322 (x 1)" or just use 1
       let quantity = 1;
@@ -132,20 +126,8 @@ const calculateOrderProfitData = async (orderItems, couponDiscount = 0) => {
         revenue: totalRevenue, // Final revenue (already after discount)
         profit: totalProfit, // Total profit
       });
-      console.log("✅ Processed order:", {
-        quantity,
-        originalPrice,
-        finalPrice: finalPrice + " (TOTAL price, not unit price)",
-        costPrice: costPrice + " (unit cost price)",
-        couponDiscount,
-        revenue: totalRevenue + " (= finalPrice, not finalPrice × quantity)",
-        itemCost: itemCost + " (= costPrice × quantity)",
-        totalProfit,
-        profitMargin:
-          totalRevenue > 0
-            ? ((totalProfit / totalRevenue) * 100).toFixed(2) + "%"
-            : "0%",
-      }); // Calculate the final profit
+
+      // Calculate the final profit
       // totalProfit is already calculated above
 
       return {
@@ -321,7 +303,6 @@ exports.createOrder = async (req, res) => {
     );
     if (profitData) {
       orderData.profitData = profitData;
-      console.log("✅ Profit data calculated for new order:", profitData);
     } else {
       console.warn("⚠️ Failed to calculate profit data for new order");
     }
@@ -406,7 +387,7 @@ exports.createOrder = async (req, res) => {
           originalAmount: originalAmount,
           discountAmount: discountAmount,
           couponCode: orderData.coupon ? orderData.coupon.code : null,
-          currency: order.currency || "NPR",
+          currency: "NPR",
           paymentMethod: paymentMethod || "Not specified",
           playerID: order.playerID,
           username: order.username,
@@ -426,7 +407,7 @@ exports.createOrder = async (req, res) => {
               originalAmount: originalAmount,
               discountAmount: discountAmount,
               couponCode: orderData.coupon ? orderData.coupon.code : null,
-              currency: order.currency || "NPR",
+              currency: "NPR",
               playerID: order.playerID,
               username: order.username,
               paymentMethod: paymentMethod || "Not specified",
@@ -684,7 +665,7 @@ exports.updateOrderStatus = async (req, res) => {
               quantity: updatedOrder.order.quantity || 1,
               totalAmount:
                 updatedOrder.order.price || updatedOrder.order.totalAmount,
-              currency: updatedOrder.order.currency || "NPR",
+              currency: "NPR",
               paymentMethod: updatedOrder.paymentMethod || "Not specified",
               playerID: updatedOrder.order.playerID,
               username: updatedOrder.order.username,
@@ -700,7 +681,7 @@ exports.updateOrderStatus = async (req, res) => {
               productName: updatedOrder.order.title || "Gaming Product",
               totalAmount:
                 updatedOrder.order.price || updatedOrder.order.totalAmount,
-              currency: updatedOrder.order.currency || "NPR",
+              currency: "NPR",
               paymentMethod: updatedOrder.paymentMethod || "Not specified",
               playerID: updatedOrder.order.playerID,
               username: updatedOrder.order.username,
