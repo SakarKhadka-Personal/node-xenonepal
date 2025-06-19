@@ -375,9 +375,7 @@ exports.createOrder = async (req, res) => {
         const discountAmount = orderData.coupon
           ? orderData.coupon.discountAmount
           : 0;
-        const finalAmount = originalAmount - discountAmount;
-
-        // Send customer confirmation email
+        const finalAmount = originalAmount - discountAmount; // Send customer confirmation email
         await emailService.sendOrderCompletionEmail(user.email, {
           userName: user.name,
           orderId: newOrder._id.toString().slice(-8),
@@ -391,10 +389,11 @@ exports.createOrder = async (req, res) => {
           paymentMethod: paymentMethod || "Not specified",
           playerID: order.playerID,
           username: order.username,
+          billingName: user.name,
+          billingEmail: user.email,
+          billingPhone: user.phone || "Not provided",
           createdAt: newOrder.createdAt,
-        });
-
-        // Send admin notification for new order (optimized - runs in background)
+        }); // Send admin notification for new order (optimized - runs in background)
         setImmediate(() => {
           emailService
             .sendAdminNewOrderNotification({
@@ -411,6 +410,9 @@ exports.createOrder = async (req, res) => {
               playerID: order.playerID,
               username: order.username,
               paymentMethod: paymentMethod || "Not specified",
+              billingName: user.name,
+              billingEmail: user.email,
+              billingPhone: user.phone || "Not provided",
               createdAt: newOrder.createdAt,
             })
             .catch((error) => {
@@ -655,9 +657,7 @@ exports.updateOrderStatus = async (req, res) => {
               console.log(
                 `❌ No XenoCoins awarded - Order amount is 0 or undefined for order ${updatedOrder._id}`
               );
-            }
-
-            // Send customer delivery notification for delivered orders
+            } // Send customer delivery notification for delivered orders
             await emailService.sendOrderDeliveredEmail(user.email, {
               userName: user.name,
               orderId: updatedOrder._id.toString().slice(-8),
@@ -669,10 +669,11 @@ exports.updateOrderStatus = async (req, res) => {
               paymentMethod: updatedOrder.paymentMethod || "Not specified",
               playerID: updatedOrder.order.playerID,
               username: updatedOrder.order.username,
+              billingName: user.name,
+              billingEmail: user.email,
+              billingPhone: user.phone || "Not provided",
             });
-          }
-
-          // Send admin notification for status update
+          } // Send admin notification for status update
           await emailService.sendAdminOrderStatusUpdate(
             {
               orderId: updatedOrder._id.toString().slice(-8),
@@ -685,6 +686,9 @@ exports.updateOrderStatus = async (req, res) => {
               paymentMethod: updatedOrder.paymentMethod || "Not specified",
               playerID: updatedOrder.order.playerID,
               username: updatedOrder.order.username,
+              billingName: user.name,
+              billingEmail: user.email,
+              billingPhone: user.phone || "Not provided",
             },
             "previous_status",
             status.toLowerCase()

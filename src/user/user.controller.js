@@ -206,7 +206,7 @@ const getUserStats = async (req, res) => {
 // Sync user data from Firebase
 const syncUser = async (req, res) => {
   try {
-    const { name, email, googleId, photoURL } = req.body;
+    const { name, email, googleId, photoURL, phone } = req.body;
 
     if (!email || !googleId) {
       return res.status(400).json({
@@ -228,6 +228,7 @@ const syncUser = async (req, res) => {
         }
         if (name) user.name = name;
         if (photoURL) user.photoURL = photoURL;
+        if (phone && !user.phone) user.phone = phone; // Only set if user doesn't have phone
 
         user = await user.save();
       } catch (saveErr) {
@@ -245,6 +246,7 @@ const syncUser = async (req, res) => {
           email,
           googleId,
           photoURL: photoURL || "",
+          phone: phone || "",
           role: "user",
           status: "active",
           lastLogin: new Date(),
