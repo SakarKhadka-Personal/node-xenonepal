@@ -240,6 +240,259 @@ Thank you for being a valued member of our gaming community!
       return false;
     }
   }
+
+  // Order completion email (sent when order is created)
+  async sendOrderCompletionEmail(userEmail, orderData) {
+    try {
+      console.log(`📧 Sending order completion email to ${userEmail}`);
+
+      const formattedOrderDate = new Date(
+        orderData.createdAt
+      ).toLocaleDateString();
+      const discountInfo =
+        orderData.discountAmount > 0
+          ? `\n\nDiscount Applied: ${orderData.couponCode} (-NPR ${orderData.discountAmount})`
+          : "";
+
+      return this.sendCustomEmail(userEmail, {
+        customerName:
+          orderData.userName || orderData.billingName || "Valued Customer",
+        subject: `🎮 Order Confirmed #${orderData.orderId} - XenoNepal`,
+        message: `Great news! Your order has been confirmed and is now being processed.
+
+Order Details:
+• Order ID: #${orderData.orderId}
+• Product: ${orderData.productName}
+• Quantity: ${orderData.quantity}
+• Total Amount: ${orderData.currency} ${orderData.totalAmount}
+• Payment Method: ${orderData.paymentMethod}
+• Order Date: ${formattedOrderDate}${discountInfo}
+
+Game Details:
+• Player ID: ${orderData.playerID || "Not provided"}
+• Username: ${orderData.username || "Not provided"}
+
+You'll receive another notification once your order is delivered. Thank you for choosing XenoNepal!
+
+Track your order: https://xenonepal.com/user/orders`,
+      });
+    } catch (error) {
+      console.error("Error in sendOrderCompletionEmail:", error);
+      return false;
+    }
+  }
+
+  // Order delivered email (sent when order status changes to delivered)
+  async sendOrderDeliveredEmail(userEmail, orderData) {
+    try {
+      console.log(`📧 Sending order delivered email to ${userEmail}`);
+
+      const deliveryDate = new Date().toLocaleDateString();
+
+      return this.sendCustomEmail(userEmail, {
+        customerName:
+          orderData.userName || orderData.billingName || "Valued Customer",
+        subject: `✅ Order Delivered #${orderData.orderId} - XenoNepal`,
+        message: `Excellent! Your order has been successfully delivered.
+
+Delivered Order Details:
+• Order ID: #${orderData.orderId}
+• Product: ${orderData.productName}
+• Quantity: ${orderData.quantity}
+• Total Amount: ${orderData.currency} ${orderData.totalAmount}
+• Delivered On: ${deliveryDate}
+
+Game Details:
+• Player ID: ${orderData.playerID || "Not provided"}
+• Username: ${orderData.username || "Not provided"}
+
+Your gaming credits/subscription have been added to your account. Please check your game to confirm the delivery.
+
+If you don't see the credits within 10 minutes, please contact our support team.
+
+Enjoy your gaming experience! 🎮`,
+      });
+    } catch (error) {
+      console.error("Error in sendOrderDeliveredEmail:", error);
+      return false;
+    }
+  }
+
+  // Admin new order notification
+  async sendAdminNewOrderNotification(orderData) {
+    try {
+      console.log(
+        `📧 Sending admin new order notification for order #${orderData.orderId}`
+      );
+
+      const emailSettings = await this.loadEmailSettings();
+      const adminEmail = emailSettings.supportEmail || "xenonepal@gmail.com";
+
+      const orderDate = new Date(orderData.createdAt).toLocaleDateString();
+      const discountInfo =
+        orderData.discountAmount > 0
+          ? `\n• Discount Applied: ${orderData.couponCode} (-NPR ${orderData.discountAmount})`
+          : "";
+
+      return this.sendCustomEmail(adminEmail, {
+        customerName: "Admin",
+        subject: `🚨 New Order Alert #${orderData.orderId} - Action Required`,
+        message: `A new order has been placed and requires processing.
+
+Order Information:
+• Order ID: #${orderData.orderId}
+• Customer: ${orderData.customerName} (${orderData.customerEmail})
+• Product: ${orderData.productName}
+• Quantity: ${orderData.quantity}
+• Total Amount: ${orderData.currency} ${orderData.totalAmount}
+• Payment Method: ${orderData.paymentMethod}
+• Order Date: ${orderDate}${discountInfo}
+
+Game Details:
+• Player ID: ${orderData.playerID || "Not provided"}
+• Username: ${orderData.username || "Not provided"}
+
+Customer Billing:
+• Name: ${orderData.billingName}
+• Email: ${orderData.billingEmail}
+• Phone: ${orderData.billingPhone}
+
+⚠️ Action Required: Please process this order promptly to ensure customer satisfaction.
+
+View in Admin Panel: https://xenonepal.com/admin/orders`,
+      });
+    } catch (error) {
+      console.error("Error in sendAdminNewOrderNotification:", error);
+      return false;
+    }
+  }
+
+  // Admin order status update notification
+  async sendAdminOrderStatusUpdate(orderData, oldStatus, newStatus) {
+    try {
+      console.log(
+        `📧 Sending admin status update notification for order #${orderData.orderId}`
+      );
+
+      const emailSettings = await this.loadEmailSettings();
+      const adminEmail = emailSettings.supportEmail || "xenonepal@gmail.com";
+
+      const updateDate = new Date().toLocaleDateString();
+
+      return this.sendCustomEmail(adminEmail, {
+        customerName: "Admin",
+        subject: `📋 Order Status Updated #${
+          orderData.orderId
+        } - ${newStatus.toUpperCase()}`,
+        message: `Order status has been updated in the system.
+
+Status Change:
+• Order ID: #${orderData.orderId}
+• Previous Status: ${oldStatus || "Unknown"}
+• New Status: ${newStatus.toUpperCase()}
+• Update Date: ${updateDate}
+
+Order Information:
+• Customer: ${orderData.customerName} (${orderData.customerEmail})
+• Product: ${orderData.productName}
+• Total Amount: ${orderData.currency} ${orderData.totalAmount}
+• Payment Method: ${orderData.paymentMethod}
+
+Game Details:
+• Player ID: ${orderData.playerID || "Not provided"}
+• Username: ${orderData.username || "Not provided"}
+
+Customer Billing:
+• Name: ${orderData.billingName}
+• Email: ${orderData.billingEmail}
+• Phone: ${orderData.billingPhone}
+
+View All Orders: https://xenonepal.com/admin/orders`,
+      });
+    } catch (error) {
+      console.error("Error in sendAdminOrderStatusUpdate:", error);
+      return false;
+    }
+  }
+
+  // Exclusive coupon email (sent when coupon is created for specific users)
+  async sendExclusiveCouponEmail(userEmail, userData, couponData) {
+    try {
+      console.log(`📧 Sending exclusive coupon email to ${userEmail}`);
+
+      const expiryDate = new Date(couponData.expiresAt).toLocaleDateString();
+      const issuedDate = new Date().toLocaleDateString();
+
+      const discountText =
+        couponData.discountType === "percentage"
+          ? `${couponData.discountValue}% OFF${
+              couponData.maxDiscount
+                ? ` (Max: NPR ${couponData.maxDiscount})`
+                : ""
+            }`
+          : `NPR ${couponData.discountValue} OFF`;
+
+      return this.sendCustomEmail(userEmail, {
+        customerName: userData.name || "Valued Customer",
+        subject: `🎁 Exclusive Coupon Just for You: ${couponData.code} - XenoNepal`,
+        message: `We're excited to share this exclusive coupon created especially for you!
+
+🎉 YOUR EXCLUSIVE COUPON: ${couponData.code}
+
+Discount: ${discountText}
+
+Coupon Details:
+• Code: ${couponData.code}
+• Discount: ${discountText}
+• Usage Limit: ${couponData.usagePerUser} time(s) for you personally
+• Valid Until: ${expiryDate}
+• Issued Date: ${issuedDate}
+
+✨ This coupon is exclusively yours! Don't miss out on this special offer - it's valid for a limited time only.
+
+How to use: Simply enter the coupon code "${couponData.code}" during checkout to apply your exclusive discount.
+
+Start shopping now and save: https://xenonepal.com
+
+Happy Gaming! 🎮`,
+      });
+    } catch (error) {
+      console.error("Error in sendExclusiveCouponEmail:", error);
+      return false;
+    }
+  }
+
+  // Order cancelled email (for future use)
+  async sendOrderCancelledEmail(userEmail, orderData) {
+    try {
+      console.log(`📧 Sending order cancelled email to ${userEmail}`);
+
+      const cancelDate = new Date().toLocaleDateString();
+
+      return this.sendCustomEmail(userEmail, {
+        customerName:
+          orderData.userName || orderData.billingName || "Valued Customer",
+        subject: `❌ Order Cancelled #${orderData.orderId} - XenoNepal`,
+        message: `We're sorry to inform you that your order has been cancelled.
+
+Cancelled Order Details:
+• Order ID: #${orderData.orderId}
+• Product: ${orderData.productName}
+• Quantity: ${orderData.quantity}
+• Amount: ${orderData.currency} ${orderData.totalAmount}
+• Cancelled On: ${cancelDate}
+
+If this cancellation was unexpected or if you have any questions, please contact our support team immediately.
+
+We apologize for any inconvenience caused and appreciate your understanding.
+
+Contact Support: https://xenonepal.com/contact`,
+      });
+    } catch (error) {
+      console.error("Error in sendOrderCancelledEmail:", error);
+      return false;
+    }
+  }
 }
 
 module.exports = new EmailService();

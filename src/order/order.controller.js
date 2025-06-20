@@ -474,10 +474,8 @@ exports.getAllOrders = async (req, res) => {
       // Add user search condition if we found matching users
       if (userIds.length > 0) {
         searchConditions.push({ userId: { $in: userIds } });
-      }
-
-      // Try to search by ObjectId if the search term could be a valid ObjectId
-      if (search.match(/^[0-9a-fA-F]{24}$/) || search.length >= 8) {
+      } // Try to search by ObjectId if the search term could be a valid ObjectId
+      if (search.match(/^[0-9a-fA-F]{6,24}$/) && search.length >= 6) {
         // Add partial ObjectId search (convert to string first)
         searchConditions.push({
           $expr: {
@@ -631,7 +629,6 @@ exports.updateOrderStatus = async (req, res) => {
           );
           await addOrderProfitToTransactions(updatedOrder, updatedOrder.userId);
         }
-
         if (user && user.email) {
           // Award XenoCoins for delivered orders
           if (status.toLowerCase() === "delivered") {
@@ -664,7 +661,9 @@ exports.updateOrderStatus = async (req, res) => {
               console.log(
                 `❌ No XenoCoins awarded - Order amount is 0 or undefined for order ${updatedOrder._id}`
               );
-            } // Send customer delivery notification for delivered orders
+            }
+
+            // Send customer delivery notification for delivered orders
             await emailService.sendOrderDeliveredEmail(user.email, {
               userName: user.name,
               orderId: updatedOrder._id.toString().slice(-8),
@@ -680,7 +679,31 @@ exports.updateOrderStatus = async (req, res) => {
               billingEmail: user.email,
               billingPhone: user.phone || "Not provided",
             });
-          } // Send admin notification for status update
+          }
+
+          // Send customer cancellation notification for cancelled orders
+          if (
+            status.toLowerCase() === "cancelled" ||
+            status.toLowerCase() === "canceled"
+          ) {
+            await emailService.sendOrderCancelledEmail(user.email, {
+              userName: user.name,
+              orderId: updatedOrder._id.toString().slice(-8),
+              productName: updatedOrder.order.title || "Gaming Product",
+              quantity: updatedOrder.order.quantity || 1,
+              totalAmount:
+                updatedOrder.order.price || updatedOrder.order.totalAmount,
+              currency: "NPR",
+              paymentMethod: updatedOrder.paymentMethod || "Not specified",
+              playerID: updatedOrder.order.playerID,
+              username: updatedOrder.order.username,
+              billingName: user.name,
+              billingEmail: user.email,
+              billingPhone: user.phone || "Not provided",
+            });
+          }
+
+          // Send admin notification for all status updates
           await emailService.sendAdminOrderStatusUpdate(
             {
               orderId: updatedOrder._id.toString().slice(-8),
@@ -697,8 +720,8 @@ exports.updateOrderStatus = async (req, res) => {
               billingEmail: user.email,
               billingPhone: user.phone || "Not provided",
             },
-            "previous_status",
-            status.toLowerCase()
+            currentOrder.status, // previous status
+            status.toLowerCase() // new status
           );
         }
       } catch (emailError) {

@@ -104,7 +104,123 @@ router.post("/test-html", async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Error sending HTML test email:", error);
+    console.error("Error in test-html endpoint:", error);
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+      success: false,
+    });
+  }
+});
+
+// Test order emails endpoint
+router.post("/test-order-emails", async (req, res) => {
+  try {
+    const { to, type = "all" } = req.body;
+
+    if (!to) {
+      return res.status(400).json({ message: "Email address is required" });
+    }
+
+    const results = {};
+    const mockOrderData = {
+      userName: "Test User",
+      orderId: "TEST123",
+      productName: "PUBG Mobile UC 1800",
+      quantity: 1,
+      totalAmount: 2500,
+      originalAmount: 2800,
+      discountAmount: 300,
+      couponCode: "SAVE300",
+      currency: "NPR",
+      paymentMethod: "eSewa",
+      playerID: "123456789",
+      username: "TestPlayer",
+      billingName: "Test User",
+      billingEmail: to,
+      billingPhone: "+977-9800000000",
+      createdAt: new Date(),
+      customerName: "Test User",
+      customerEmail: to,
+    };
+
+    const mockCouponData = {
+      name: "Test User",
+      email: to,
+    };
+
+    const mockCoupon = {
+      code: "EXCLUSIVE50",
+      discountType: "percentage",
+      discountValue: 50,
+      maxDiscount: 1000,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      usageLimit: 1,
+      usagePerUser: 1,
+    };
+
+    if (type === "all" || type === "confirmation") {
+      console.log("🧪 Testing order confirmation email...");
+      results.confirmation = await emailService.sendOrderCompletionEmail(
+        to,
+        mockOrderData
+      );
+    }
+
+    if (type === "all" || type === "delivered") {
+      console.log("🧪 Testing order delivered email...");
+      results.delivered = await emailService.sendOrderDeliveredEmail(
+        to,
+        mockOrderData
+      );
+    }
+
+    if (type === "all" || type === "cancelled") {
+      console.log("🧪 Testing order cancelled email...");
+      results.cancelled = await emailService.sendOrderCancelledEmail(
+        to,
+        mockOrderData
+      );
+    }
+
+    if (type === "all" || type === "admin-new") {
+      console.log("🧪 Testing admin new order email...");
+      results.adminNew = await emailService.sendAdminNewOrderNotification(
+        mockOrderData
+      );
+    }
+
+    if (type === "all" || type === "admin-status") {
+      console.log("🧪 Testing admin status update email...");
+      results.adminStatus = await emailService.sendAdminOrderStatusUpdate(
+        mockOrderData,
+        "pending",
+        "delivered"
+      );
+    }
+
+    if (type === "all" || type === "coupon") {
+      console.log("🧪 Testing exclusive coupon email...");
+      results.coupon = await emailService.sendExclusiveCouponEmail(
+        to,
+        mockCouponData,
+        mockCoupon
+      );
+    }
+
+    const successCount = Object.values(results).filter(
+      (result) => result
+    ).length;
+    const totalCount = Object.keys(results).length;
+
+    res.status(200).json({
+      message: `Test emails completed: ${successCount}/${totalCount} sent successfully`,
+      success: true,
+      results: results,
+      testType: type,
+    });
+  } catch (error) {
+    console.error("Error in test-order-emails endpoint:", error);
     res.status(500).json({
       message: "Internal server error",
       error: error.message,
