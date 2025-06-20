@@ -14,8 +14,12 @@ const {
 const emailService = require("./emailService");
 const User = require("../user/user.model");
 const { verifyAdmin } = require("../middleware/adminAuth");
+const emailDiagnosticsRouter = require("./email-diagnostics.route");
 
 const router = express.Router();
+
+// Use the diagnostics routes
+router.use("/diagnostics", emailDiagnosticsRouter);
 
 // Send custom email to users endpoint
 router.post("/send-custom", verifyAdmin, async (req, res) => {
