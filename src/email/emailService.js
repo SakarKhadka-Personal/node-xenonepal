@@ -240,10 +240,18 @@ Thank you for being a valued member of our gaming community!
       return false;
     }
   }
-
   // Order completion email (sent when order is created)
   async sendOrderCompletionEmail(userEmail, orderData) {
     try {
+      // Check if this email template is enabled
+      const isEnabled = await this.isEmailTemplateEnabled("order_completion");
+      if (!isEnabled) {
+        console.log(
+          `📧 Order completion email is disabled. Not sending to ${userEmail}`
+        );
+        return false;
+      }
+
       console.log(`📧 Sending order completion email to ${userEmail}`);
 
       const formattedOrderDate = new Date(
@@ -281,10 +289,18 @@ Track your order: https://xenonepal.com/user/orders`,
       return false;
     }
   }
-
   // Order delivered email (sent when order status changes to delivered)
   async sendOrderDeliveredEmail(userEmail, orderData) {
     try {
+      // Check if this email template is enabled
+      const isEnabled = await this.isEmailTemplateEnabled("order_delivered");
+      if (!isEnabled) {
+        console.log(
+          `📧 Order delivered email is disabled. Not sending to ${userEmail}`
+        );
+        return false;
+      }
+
       console.log(`📧 Sending order delivered email to ${userEmail}`);
 
       const deliveryDate = new Date().toLocaleDateString();
@@ -316,17 +332,37 @@ Enjoy your gaming experience! 🎮`,
       console.error("Error in sendOrderDeliveredEmail:", error);
       return false;
     }
-  }
-
-  // Admin new order notification
+  } // Admin new order notification
   async sendAdminNewOrderNotification(orderData) {
     try {
+      // Check if this email template is enabled
+      const isEnabled = await this.isEmailTemplateEnabled("admin_new_order");
+      if (!isEnabled) {
+        console.log(`📧 Admin new order notification is disabled.`);
+        return false;
+      }
+
       console.log(
         `📧 Sending admin new order notification for order #${orderData.orderId}`
       );
 
-      const emailSettings = await this.loadEmailSettings();
-      const adminEmail = emailSettings.supportEmail || "xenonepal@gmail.com";
+      // Get all users with admin role
+      const User = require("../user/user.model");
+      const adminUsers = await User.find({ role: "admin", status: "active" });
+
+      if (!adminUsers || adminUsers.length === 0) {
+        console.log(
+          "No admin users found. Sending to support email as fallback."
+        );
+        const emailSettings = await this.loadEmailSettings();
+        const fallbackEmail =
+          emailSettings.supportEmail || "xenonepal@gmail.com";
+        adminUsers.push({ email: fallbackEmail, name: "Admin" });
+      }
+
+      console.log(
+        `Found ${adminUsers.length} admin users to notify about new order`
+      );
 
       const orderDate = new Date(orderData.createdAt).toLocaleDateString();
       const discountInfo =
@@ -334,10 +370,14 @@ Enjoy your gaming experience! 🎮`,
           ? `\n• Discount Applied: ${orderData.couponCode} (-NPR ${orderData.discountAmount})`
           : "";
 
-      return this.sendCustomEmail(adminEmail, {
-        customerName: "Admin",
-        subject: `🚨 New Order Alert #${orderData.orderId} - Action Required`,
-        message: `A new order has been placed and requires processing.
+      // Send email to each admin user
+      const emailPromises = adminUsers.map((admin) => {
+        console.log(`Sending new order notification to admin: ${admin.email}`);
+
+        return this.sendCustomEmail(admin.email, {
+          customerName: admin.name || "Admin",
+          subject: `🚨 New Order Alert #${orderData.orderId} - Action Required`,
+          message: `A new order has been placed and requires processing.
 
 Order Information:
 • Order ID: #${orderData.orderId}
@@ -360,31 +400,70 @@ Customer Billing:
 ⚠️ Action Required: Please process this order promptly to ensure customer satisfaction.
 
 View in Admin Panel: https://xenonepal.com/admin/orders`,
+        });
       });
+
+      // Wait for all emails to be sent
+      const results = await Promise.allSettled(emailPromises);
+      const successCount = results.filter(
+        (result) => result.status === "fulfilled" && result.value
+      ).length;
+
+      console.log(
+        `✅ Sent new order notifications to ${successCount}/${adminUsers.length} admins`
+      );
+
+      // Return true if at least one email was sent successfully
+      return successCount > 0;
     } catch (error) {
       console.error("Error in sendAdminNewOrderNotification:", error);
       return false;
     }
-  }
-
-  // Admin order status update notification
+  } // Admin order status update notification
   async sendAdminOrderStatusUpdate(orderData, oldStatus, newStatus) {
     try {
+      // Check if this email template is enabled
+      const isEnabled = await this.isEmailTemplateEnabled(
+        "admin_order_status_update"
+      );
+      if (!isEnabled) {
+        console.log(`📧 Admin order status update notification is disabled.`);
+        return false;
+      }
+
       console.log(
         `📧 Sending admin status update notification for order #${orderData.orderId}`
       );
 
-      const emailSettings = await this.loadEmailSettings();
-      const adminEmail = emailSettings.supportEmail || "xenonepal@gmail.com";
+      // Get all users with admin role
+      const User = require("../user/user.model");
+      const adminUsers = await User.find({ role: "admin", status: "active" });
+
+      if (!adminUsers || adminUsers.length === 0) {
+        console.log(
+          "No admin users found. Sending to support email as fallback."
+        );
+        const emailSettings = await this.loadEmailSettings();
+        const fallbackEmail =
+          emailSettings.supportEmail || "xenonepal@gmail.com";
+        adminUsers.push({ email: fallbackEmail, name: "Admin" });
+      }
+
+      console.log(
+        `Found ${adminUsers.length} admin users to notify about order status update`
+      );
 
       const updateDate = new Date().toLocaleDateString();
 
-      return this.sendCustomEmail(adminEmail, {
-        customerName: "Admin",
-        subject: `📋 Order Status Updated #${
-          orderData.orderId
-        } - ${newStatus.toUpperCase()}`,
-        message: `Order status has been updated in the system.
+      // Send email to each admin user
+      const emailPromises = adminUsers.map((admin) => {
+        console.log(`Sending order status update to admin: ${admin.email}`);
+        return this.sendCustomEmail(admin.email, {
+          customerName: admin.name || "Admin",
+          subject: `📋 Order Status Updated #${
+            orderData.orderId
+          } - ${newStatus.toUpperCase()}`,
+          message: `Order status has been updated in the system.
 
 Status Change:
 • Order ID: #${orderData.orderId}
@@ -408,7 +487,20 @@ Customer Billing:
 • Phone: ${orderData.billingPhone}
 
 View All Orders: https://xenonepal.com/admin/orders`,
+        });
       });
+
+      // Wait for all emails to be sent
+      const results = await Promise.allSettled(emailPromises);
+      const successCount = results.filter(
+        (result) => result.status === "fulfilled" && result.value
+      ).length;
+
+      console.log(
+        `✅ Sent order status update notifications to ${successCount}/${adminUsers.length} admins`
+      );
+      // Return true if at least one email was sent successfully
+      return successCount > 0;
     } catch (error) {
       console.error("Error in sendAdminOrderStatusUpdate:", error);
       return false;
@@ -418,6 +510,15 @@ View All Orders: https://xenonepal.com/admin/orders`,
   // Exclusive coupon email (sent when coupon is created for specific users)
   async sendExclusiveCouponEmail(userEmail, userData, couponData) {
     try {
+      // Check if this email template is enabled
+      const isEnabled = await this.isEmailTemplateEnabled("exclusive_coupon");
+      if (!isEnabled) {
+        console.log(
+          `📧 Exclusive coupon email is disabled. Not sending to ${userEmail}`
+        );
+        return false;
+      }
+
       console.log(`📧 Sending exclusive coupon email to ${userEmail}`);
 
       const expiryDate = new Date(couponData.expiresAt).toLocaleDateString();
@@ -461,10 +562,18 @@ Happy Gaming! 🎮`,
       return false;
     }
   }
-
   // Order cancelled email (for future use)
   async sendOrderCancelledEmail(userEmail, orderData) {
     try {
+      // Check if this email template is enabled
+      const isEnabled = await this.isEmailTemplateEnabled("order_cancelled");
+      if (!isEnabled) {
+        console.log(
+          `📧 Order cancelled email is disabled. Not sending to ${userEmail}`
+        );
+        return false;
+      }
+
       console.log(`📧 Sending order cancelled email to ${userEmail}`);
 
       const cancelDate = new Date().toLocaleDateString();
@@ -490,6 +599,109 @@ Contact Support: https://xenonepal.com/contact`,
       });
     } catch (error) {
       console.error("Error in sendOrderCancelledEmail:", error);
+      return false;
+    }
+  }
+
+  // Check if a specific email template type is enabled
+  async isEmailTemplateEnabled(templateType) {
+    try {
+      const EmailTemplate = require("./emailTemplate.model");
+      const template = await EmailTemplate.findOne({ type: templateType });
+
+      // If the template doesn't exist or is not active, return false
+      if (!template || !template.isActive) {
+        console.log(`📧 Email template ${templateType} is not enabled.`);
+        return false;
+      }
+
+      // Also check global email settings
+      const emailSettings = await this.loadEmailSettings();
+      if (!emailSettings.enableEmailNotifications) {
+        console.log(`📧 Email notifications are globally disabled.`);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        `Error checking email template status for ${templateType}:`,
+        error
+      );
+      return false;
+    }
+  }
+
+  // Welcome email (sent when user logs in)
+  async sendWelcomeEmail(userEmail, userData) {
+    try {
+      // Check if this email template is enabled
+      const isEnabled = await this.isEmailTemplateEnabled("welcome");
+      if (!isEnabled) {
+        console.log(
+          `📧 Welcome email is disabled. Not sending to ${userEmail}`
+        );
+        return false;
+      }
+
+      console.log(`📧 Sending welcome email to ${userEmail}`);
+
+      return this.sendCustomEmail(userEmail, {
+        customerName: userData.name || "Valued Customer",
+        subject: `👋 Welcome to XenoNepal!`,
+        message: `Welcome to XenoNepal, your trusted gaming service provider in Nepal!
+
+We're thrilled to have you as part of our gaming community. Here are some of the benefits of being a XenoNepal member:
+
+• Easy access to game top-ups, subscriptions, and gift cards
+• Secure payment methods and instant delivery
+• XenoCoins rewards program - earn on every purchase
+• Exclusive deals and promotions for registered users
+
+Your account is now active and ready to use. Feel free to browse our catalog and make your first purchase!
+
+Happy Gaming!`,
+      });
+    } catch (error) {
+      console.error("Error in sendWelcomeEmail:", error);
+      return false;
+    }
+  }
+
+  // User registration email (sent when user first registers)
+  async sendRegistrationEmail(userEmail, userData) {
+    try {
+      // Check if this email template is enabled
+      const isEnabled = await this.isEmailTemplateEnabled("user_registration");
+      if (!isEnabled) {
+        console.log(
+          `📧 Registration email is disabled. Not sending to ${userEmail}`
+        );
+        return false;
+      }
+
+      console.log(`📧 Sending registration confirmation email to ${userEmail}`);
+
+      return this.sendCustomEmail(userEmail, {
+        customerName: userData.name || "Valued Customer",
+        subject: `✅ Your XenoNepal Account Has Been Created!`,
+        message: `Thank you for creating your account with XenoNepal!
+
+Your account has been successfully created and is ready to use. Here's what you can do next:
+
+• Browse our catalog of gaming products
+• Top up your favorite games
+• Purchase subscriptions at competitive prices
+• Redeem gift cards for various platforms
+
+We recommend verifying your email and completing your profile for a seamless experience.
+
+If you have any questions or need assistance, feel free to contact our support team.
+
+Welcome to the XenoNepal family!`,
+      });
+    } catch (error) {
+      console.error("Error in sendRegistrationEmail:", error);
       return false;
     }
   }

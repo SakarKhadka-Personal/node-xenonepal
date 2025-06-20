@@ -157,6 +157,67 @@ const getTemplateVariablesSummary = async (req, res) => {
   }
 };
 
+// Update the active status of a template
+const toggleTemplateStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const template = await EmailTemplate.findById(id);
+
+    if (!template) {
+      return res.status(404).json({ message: "Template not found" });
+    }
+
+    // Toggle the isActive status
+    template.isActive = !template.isActive;
+    await template.save();
+
+    res.status(200).json({
+      message: `Template ${
+        template.isActive ? "enabled" : "disabled"
+      } successfully`,
+      template,
+    });
+  } catch (error) {
+    console.error("Error toggling template status:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Get template status summary
+const getTemplateStatusSummary = async (req, res) => {
+  try {
+    const templates = await EmailTemplate.find().select(
+      "type subject isActive"
+    );
+
+    // Group templates by category
+    const groupedTemplates = {
+      customer: templates.filter((t) =>
+        [
+          "order_completion",
+          "order_delivered",
+          "order_cancelled",
+          "user_registration",
+          "welcome",
+          "exclusive_coupon",
+        ].includes(t.type)
+      ),
+      admin: templates.filter((t) =>
+        ["admin_new_order", "admin_order_status_update"].includes(t.type)
+      ),
+      other: templates.filter((t) => ["test_email"].includes(t.type)),
+    };
+
+    res.status(200).json({
+      message: "Template status summary retrieved successfully",
+      templates: groupedTemplates,
+    });
+  } catch (error) {
+    console.error("Error getting template status summary:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 // Initialize default templates
 const initializeDefaultTemplates = async (req, res) => {
   try {
@@ -387,550 +448,238 @@ If you have any questions, please contact us at {{supportEmail}}
         ],
       },
       {
-        type: "user_registration",
-        subject: "Welcome to {{appName}} - Your Gaming Journey Starts Here!",
+        type: "welcome",
+        subject: "Welcome Back to {{appName}}!",
         htmlContent: `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to {{appName}}</title>
+  <title>Welcome Back!</title>
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
     .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    .header { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); color: white; padding: 30px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
     .content { padding: 20px; }
-    .welcome-box { background-color: #fff3cd; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107; }
-    .features { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
-    .feature { background-color: #e9ecef; padding: 10px; border-radius: 5px; flex: 1; min-width: 200px; }
+    .benefits { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
     .footer { text-align: center; padding: 20px; color: #666; border-top: 1px solid #eee; }
-    .btn { display: inline-block; background-color: #ff6b6b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 5px; }
-    .welcome-icon { font-size: 48px; margin-bottom: 10px; }
+    .btn { display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 0; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <div class="welcome-icon">🎮</div>
-      <h1>Welcome to {{appName}}!</h1>
-      <p>Your gaming adventure starts here</p>
+      <h1>Welcome Back!</h1>
+      <p>We're glad to see you again at {{appName}}</p>
     </div>
     <div class="content">
-      <p>Dear {{userName}},</p>
-      <p>Welcome to {{appName}}! We're excited to have you join our community of gamers across Nepal.</p>
+      <p>Hello {{userName}},</p>
+      <p>Welcome back to {{appName}}! We've missed you and are excited to have you back.</p>
       
-      <div class="welcome-box">
-        <h3>Account Created Successfully!</h3>
-        <p><strong>Email:</strong> {{userEmail}}</p>
-        <p><strong>Registration Date:</strong> {{registrationDate}}</p>
-      </div>
-      
-      <h3>What You Can Do With {{appName}}:</h3>
-      <div class="features">
-        <div class="feature">
-          <h4>🎯 Gaming Top-ups</h4>
-          <p>PUBG UC, Free Fire Diamonds, CODM CP, and more</p>
-        </div>
-        <div class="feature">
-          <h4>📺 Digital Subscriptions</h4>
-          <p>Netflix, Amazon Prime, VPN services</p>
-        </div>
-        <div class="feature">
-          <h4>🎁 Gift Cards</h4>
-          <p>Steam, PlayStation, Xbox, and other gaming platforms</p>
-        </div>
-        <div class="feature">
-          <h4>⚡ Instant Delivery</h4>
-          <p>Get your credits delivered within minutes</p>
-        </div>
-      </div>
-      
-      <p>Start exploring our wide range of gaming products and services. Our team is here to support you 24/7!</p>
-      
-      <a href="{{websiteUrl}}" class="btn">Start Shopping</a>
-      <a href="{{websiteUrl}}/user/profile" class="btn">Complete Profile</a>
-    </div>
-    <div class="footer">
-      <p>Thank you for joining {{appName}}! Happy Gaming! 🎮</p>
-      <p>Need help? Contact us at {{supportEmail}}</p>
-      <p>&copy; {{currentYear}} {{appName}}. All rights reserved.</p>
-    </div>
-  </div>
-</body>
-</html>`,
-        textContent: `Welcome to {{appName}}!
-
-Dear {{userName}},
-
-Welcome to {{appName}}! We're excited to have you join our community of gamers across Nepal.
-
-Account Created Successfully!
-- Email: {{userEmail}}
-- Registration Date: {{registrationDate}}
-
-What You Can Do With {{appName}}:
-🎯 Gaming Top-ups: PUBG UC, Free Fire Diamonds, CODM CP, and more
-📺 Digital Subscriptions: Netflix, Amazon Prime, VPN services
-🎁 Gift Cards: Steam, PlayStation, Xbox, and other gaming platforms
-⚡ Instant Delivery: Get your credits delivered within minutes
-
-Start exploring our wide range of gaming products and services. Our team is here to support you 24/7!
-
-Visit {{websiteUrl}} to start shopping or {{websiteUrl}}/user/profile to complete your profile.
-
-Thank you for joining {{appName}}! Happy Gaming!
-
-Need help? Contact us at {{supportEmail}}
-
-© {{currentYear}} {{appName}}. All rights reserved.`,
-        availableVariables: [
-          "userName",
-          "userEmail",
-          "registrationDate",
-          "appName",
-          "supportEmail",
-          "websiteUrl",
-          "currentYear",
-        ],
-      },
-      {
-        type: "admin_new_order",
-        subject: "🚨 New Order Alert - {{orderId}} | {{appName}}",
-        htmlContent: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>New Order Alert</title>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
-    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    .header { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
-    .content { padding: 20px; }
-    .order-details { background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107; }
-    .customer-details { background-color: #d1ecf1; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #0dcaf0; }
-    .footer { text-align: center; padding: 20px; color: #666; border-top: 1px solid #eee; }
-    .btn { display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 5px; }
-    .alert-icon { font-size: 48px; margin-bottom: 10px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div class="alert-icon">🚨</div>
-      <h1>New Order Alert!</h1>
-      <p>A new order has been placed on {{appName}}</p>
-    </div>
-    <div class="content">
-      <p><strong>Action Required:</strong> A new order has been received and requires processing.</p>
-        <div class="order-details">
-        <h3>📋 Order Details:</h3>
-        <p><strong>Order ID:</strong> {{orderId}}</p>
-        <p><strong>Product:</strong> {{productName}}</p>
-        <p><strong>Quantity:</strong> {{quantity}}</p>
-        <p><strong>Total Amount:</strong> {{currency}} {{amount}}</p>
-        <p><strong>Payment Method:</strong> {{paymentMethod}}</p>
-        <p><strong>Order Date:</strong> {{orderDate}}</p>
-      </div>
-
-      <div class="customer-details">
-        <h3>👤 Customer Information:</h3>
-        <p><strong>Name:</strong> {{customerName}}</p>
-        <p><strong>Email:</strong> {{customerEmail}}</p>
-        <p><strong>Player ID:</strong> {{playerID}}</p>
-        {{#if username}}<p><strong>Username:</strong> {{username}}</p>{{/if}}
-      </div>
-      
-      <div class="customer-details" style="background-color: #e8f5e8; border-left: 4px solid #28a745;">
-        <h3>💳 Billing Information:</h3>
-        <p><strong>Billing Name:</strong> {{billingName}}</p>
-        <p><strong>Billing Email:</strong> {{billingEmail}}</p>
-        <p><strong>Billing Phone:</strong> {{billingPhone}}</p>
-      </div>
-      
-      <p>Please process this order promptly to ensure customer satisfaction.</p>
-      
-      <a href="{{websiteUrl}}/admin/orders" class="btn">View in Admin Panel</a>
-    </div>
-    <div class="footer">
-      <p>{{appName}} Admin Notification System</p>
-      <p>This is an automated notification for admins only</p>
-    </div>
-  </div>
-</body>
-</html>`,
-        textContent: `🚨 NEW ORDER ALERT - {{orderId}}
-
-A new order has been placed on {{appName}} and requires processing.
-
-📋 ORDER DETAILS:
-- Order ID: {{orderId}}
-- Product: {{productName}}
-- Quantity: {{quantity}}
-- Total Amount: {{currency}} {{amount}}
-- Payment Method: {{paymentMethod}}
-- Order Date: {{orderDate}}
-
-👤 CUSTOMER INFORMATION:
-- Name: {{customerName}}
-- Email: {{customerEmail}}
-- Player ID: {{playerID}}
-{{#if username}}- Username: {{username}}{{/if}}
-
-💳 BILLING INFORMATION:
-- Billing Name: {{billingName}}
-- Billing Email: {{billingEmail}}
-- Billing Phone: {{billingPhone}}
-
-ACTION REQUIRED: Please process this order promptly to ensure customer satisfaction.
-
-View in Admin Panel: {{websiteUrl}}/admin/orders
-
----
-{{appName}} Admin Notification System
-This is an automated notification for admins only`,
-        availableVariables: [
-          "orderId",
-          "customerName",
-          "customerEmail",
-          "productName",
-          "quantity",
-          "amount",
-          "totalAmount",
-          "currency",
-          "paymentMethod",
-          "billingName",
-          "billingEmail",
-          "billingPhone",
-          "playerID",
-          "username",
-          "orderDate",
-          "appName",
-          "websiteUrl",
-          "currentYear",
-        ],
-      },
-      {
-        type: "admin_order_status_update",
-        subject: "📋 Order Status Update - {{orderId}} | {{appName}}",
-        htmlContent: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Order Status Update</title>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
-    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    .header { background: linear-gradient(135deg, #6f42c1 0%, #5a2d91 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
-    .content { padding: 20px; }
-    .status-update { background-color: #e7f3ff; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #007bff; }
-    .order-info { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
-    .footer { text-align: center; padding: 20px; color: #666; border-top: 1px solid #eee; }
-    .btn { display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 5px; }
-    .update-icon { font-size: 48px; margin-bottom: 10px; }
-    .status-badge { background-color: #28a745; color: white; padding: 5px 10px; border-radius: 20px; font-size: 12px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div class="update-icon">📋</div>
-      <h1>Order Status Updated</h1>
-      <p>Order {{orderId}} status has been changed</p>
-    </div>
-    <div class="content">
-      <div class="status-update">
-        <h3>📊 Status Change:</h3>
-        <p><strong>Order ID:</strong> {{orderId}}</p>
-        <p><strong>Previous Status:</strong> <span style="color: #6c757d;">{{oldStatus}}</span></p>
-        <p><strong>New Status:</strong> <span class="status-badge">{{newStatus}}</span></p>
-        <p><strong>Update Date:</strong> {{updateDate}}</p>
-      </div>      <div class="order-info">
-        <h3>📋 Order Information:</h3>
-        <p><strong>Customer:</strong> {{customerName}} ({{customerEmail}})</p>
-        <p><strong>Product:</strong> {{productName}}</p>
-        <p><strong>Amount:</strong> {{currency}} {{amount}}</p>
-        <p><strong>Payment Method:</strong> {{paymentMethod}}</p>
-        <p><strong>Player ID:</strong> {{playerID}}</p>
-        {{#if username}}<p><strong>Username:</strong> {{username}}</p>{{/if}}
-      </div>
-      
-      <div class="order-info" style="background-color: #e8f5e8; border-left: 4px solid #28a745;">
-        <h3>💳 Billing Information:</h3>
-        <p><strong>Billing Name:</strong> {{billingName}}</p>
-        <p><strong>Billing Email:</strong> {{billingEmail}}</p>
-        <p><strong>Billing Phone:</strong> {{billingPhone}}</p>
-      </div>
-      
-      <a href="{{websiteUrl}}/admin/orders" class="btn">View All Orders</a>
-    </div>
-    <div class="footer">
-      <p>{{appName}} Admin Notification System</p>
-      <p>This status update notification was sent automatically</p>
-    </div>
-  </div>
-</body>
-</html>`,
-        textContent: `📋 ORDER STATUS UPDATE - {{orderId}}
-
-Order {{orderId}} status has been updated on {{appName}}.
-
-📊 STATUS CHANGE:
-- Order ID: {{orderId}}
-- Previous Status: {{oldStatus}}
-- New Status: {{newStatus}}
-- Update Date: {{updateDate}}
-
-📋 ORDER INFORMATION:
-- Customer: {{customerName}} ({{customerEmail}})
-- Product: {{productName}}
-- Amount: {{currency}} {{amount}}
-- Payment Method: {{paymentMethod}}
-- Player ID: {{playerID}}
-{{#if username}}- Username: {{username}}{{/if}}
-
-💳 BILLING INFORMATION:
-- Billing Name: {{billingName}}
-- Billing Email: {{billingEmail}}
-- Billing Phone: {{billingPhone}}
-
-View All Orders: {{websiteUrl}}/admin/orders
-
----
-{{appName}} Admin Notification System
-This status update notification was sent automatically`,
-        availableVariables: [
-          "orderId",
-          "customerName",
-          "customerEmail",
-          "productName",
-          "oldStatus",
-          "newStatus",
-          "amount",
-          "totalAmount",
-          "currency",
-          "paymentMethod",
-          "billingName",
-          "billingEmail",
-          "billingPhone",
-          "playerID",
-          "username",
-          "updateDate",
-          "appName",
-          "websiteUrl",
-          "currentYear",
-        ],
-      },
-      {
-        type: "test_email",
-        subject: "Test Email - {{appName}} Configuration Check",
-        htmlContent: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Test Email</title>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
-    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    .header { background: linear-gradient(135deg, #007bff 0%, #6610f2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
-    .content { padding: 20px; }
-    .test-details { background-color: #e7f3ff; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #007bff; }
-    .footer { text-align: center; padding: 20px; color: #666; border-top: 1px solid #eee; }
-    .success-badge { background-color: #28a745; color: white; padding: 5px 10px; border-radius: 15px; font-size: 12px; }
-    .feature-list { list-style: none; padding: 0; }
-    .feature-list li { padding: 8px 0; border-bottom: 1px solid #eee; }
-    .feature-list li:before { content: "✅ "; color: #28a745; font-weight: bold; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>🧪 Email System Test</h1>
-      <p>{{appName}} Email Configuration Check</p>
-      <span class="success-badge">HTML ENABLED</span>
-    </div>
-    <div class="content">
-      <h2>Email Service Status: <span style="color: #28a745;">✅ Working</span></h2>
-      <p>Congratulations! Your email service is properly configured and can send HTML emails.</p>
-      
-      <div class="test-details">
-        <h3>📧 Test Details:</h3>
-        <ul class="feature-list">
-          <li><strong>HTML Rendering:</strong> Successful</li>
-          <li><strong>CSS Styling:</strong> Applied</li>
-          <li><strong>Template Variables:</strong> {{testMessage}}</li>
-          <li><strong>Email Service:</strong> Operational</li>
-          <li><strong>SMTP Configuration:</strong> Valid</li>
+      <div class="benefits">
+        <h3>Your Gaming Benefits:</h3>
+        <ul>
+          <li>Easy access to game top-ups, subscriptions, and gift cards</li>
+          <li>Secure payment methods and instant delivery</li>
+          <li>XenoCoins rewards program - earn on every purchase</li>
+          <li>Exclusive deals and promotions for registered users</li>
         </ul>
       </div>
       
-      <h3>🎨 Visual Elements Test:</h3>
-      <p>If you can see this content with proper formatting, colors, and styling, then your HTML email templates are working correctly!</p>
+      <p>Ready to enhance your gaming experience? Check out our latest offerings!</p>
       
-      <p style="color: #007bff; font-size: 18px; text-align: center; background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
-        <strong>HTML Email Support: CONFIRMED ✅</strong>
-      </p>
-      
-      <p><strong>Test sent:</strong> {{currentYear}}<br>
-      <strong>From:</strong> {{appName}} Email System<br>
-      <strong>Support:</strong> {{supportEmail}}</p>
+      <div style="text-align: center;">
+        <a href="{{websiteUrl}}" class="btn">Browse Gaming Services</a>
+      </div>
     </div>
     <div class="footer">
-      <p>This test email confirms your {{appName}} email system is working properly.</p>
-      <p>You can now customize your email templates with confidence!</p>
+      <p>Thank you for choosing {{appName}}!</p>
+      <p>If you have any questions, please contact us at {{supportEmail}}</p>
       <p>&copy; {{currentYear}} {{appName}}. All rights reserved.</p>
     </div>
   </div>
 </body>
 </html>`,
-        textContent: `Email System Test - {{appName}}
+        textContent: `Welcome Back to {{appName}}!
 
-Email Service Status: ✅ Working
+Hello {{userName}},
 
-Congratulations! Your email service is properly configured.
+Welcome back to {{appName}}! We've missed you and are excited to have you back.
 
-Test Details:
-- HTML Rendering: If you see this plain text, HTML might not be supported by your email client
-- Template Variables: {{testMessage}}
-- Email Service: Operational
-- SMTP Configuration: Valid
+Your Gaming Benefits:
+- Easy access to game top-ups, subscriptions, and gift cards
+- Secure payment methods and instant delivery
+- XenoCoins rewards program - earn on every purchase
+- Exclusive deals and promotions for registered users
 
-Test sent: {{currentYear}}
-From: {{appName}} Email System
-Support: {{supportEmail}}
+Ready to enhance your gaming experience? Check out our latest offerings!
 
-This test email confirms your {{appName}} email system is working properly.
+Visit us at: {{websiteUrl}}
+
+Thank you for choosing {{appName}}!
+If you have any questions, please contact us at {{supportEmail}}
 
 © {{currentYear}} {{appName}}. All rights reserved.`,
-        availableVariables: [
-          "testMessage",
-          "appName",
-          "supportEmail",
-          "websiteUrl",
-          "currentYear",
-        ],
+        isActive: true,
       },
       {
-        type: "exclusive_coupon",
-        subject:
-          "🎉 Exclusive Coupon Just for You! - {{couponCode}} | {{appName}}",
+        type: "user_registration",
+        subject: "Account Created Successfully - {{appName}}",
         htmlContent: `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Exclusive Coupon</title>
+  <title>Account Created</title>
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
     .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    .header { background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
     .content { padding: 20px; }
-    .coupon-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; text-align: center; margin: 20px 0; border: 3px dashed #fff; }
-    .coupon-code { font-size: 28px; font-weight: bold; letter-spacing: 3px; background-color: rgba(255,255,255,0.2); padding: 10px 20px; border-radius: 5px; margin: 10px 0; }
-    .discount-badge { font-size: 24px; background-color: #28a745; color: white; padding: 10px 15px; border-radius: 50px; display: inline-block; margin: 10px 0; }
-    .coupon-details { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    .next-steps { background-color: #e8f4fd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #4a90e2; }
     .footer { text-align: center; padding: 20px; color: #666; border-top: 1px solid #eee; }
-    .btn { display: inline-block; background-color: #ff6b6b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 0; }
-    .gift-icon { font-size: 48px; margin-bottom: 10px; }
+    .btn { display: inline-block; background-color: #4a90e2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 0; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <div class="gift-icon">🎁</div>
-      <h1>Exclusive Coupon Just for You!</h1>
-      <p>{{appName}} has something special for you, {{customerName}}!</p>
+      <h1>Account Created!</h1>
+      <p>Welcome to {{appName}}</p>
     </div>
     <div class="content">
-      <p>Dear {{customerName}},</p>
-      <p>We're excited to share this exclusive coupon created especially for you! This is your personal discount that can't be found anywhere else.</p>
+      <p>Hello {{userName}},</p>
+      <p>Thank you for creating your account with {{appName}}! Your account has been successfully created and is ready to use.</p>
       
-      <div class="coupon-box">
-        <h2>🎉 Your Exclusive Coupon</h2>
-        <div class="coupon-code">{{couponCode}}</div>        <div class="discount-badge">
-          {{discountDisplay}}
-        </div>
-        <p style="margin-top: 15px; font-size: 16px;">Use this code at checkout to get your exclusive discount!</p>
+      <div class="next-steps">
+        <h3>Here's what you can do next:</h3>
+        <ul>
+          <li>Browse our catalog of gaming products</li>
+          <li>Top up your favorite games</li>
+          <li>Purchase subscriptions at competitive prices</li>
+          <li>Redeem gift cards for various platforms</li>
+        </ul>
       </div>
       
-      <div class="coupon-details">
-        <h3>📋 Coupon Details:</h3>        <p><strong>Discount:</strong> {{discountText}}</p>
-        <p><strong>Usage Limit:</strong> {{usagePerUser}} time(s) for you personally</p>
-        <p><strong>Valid Until:</strong> {{expiryDate}}</p>
-        <p><strong>Issued Date:</strong> {{issuedDate}}</p>
+      <p>We recommend verifying your email and completing your profile for a seamless experience.</p>
+      
+      <div style="text-align: center;">
+        <a href="{{websiteUrl}}/profile" class="btn">Complete Your Profile</a>
       </div>
-      
-      <p style="text-align: center; margin: 30px 0;">
-        <strong>This coupon is exclusively yours!</strong><br>
-        Don't miss out on this special offer - it's valid for a limited time only.
-      </p>
-      
-      <a href="{{websiteUrl}}" class="btn">Shop Now & Use Your Coupon</a>
-      
-      <p style="font-size: 14px; color: #666; margin-top: 20px;">
-        <strong>How to use:</strong> Simply enter the coupon code <strong>{{couponCode}}</strong> during checkout to apply your exclusive discount.
-      </p>
     </div>
     <div class="footer">
-      <p>Thank you for being a valued member of {{appName}}!</p>
-      <p>If you have any questions about your coupon, please contact us at {{supportEmail}}</p>
+      <p>Welcome to the {{appName}} family!</p>
+      <p>If you have any questions, please contact us at {{supportEmail}}</p>
       <p>&copy; {{currentYear}} {{appName}}. All rights reserved.</p>
     </div>
   </div>
 </body>
 </html>`,
-        textContent: `🎉 Exclusive Coupon Just for You! - {{couponCode}}
+        textContent: `Account Created Successfully - {{appName}}
 
-Dear {{customerName}},
+Hello {{userName}},
 
-We're excited to share this exclusive coupon created especially for you! This is your personal discount that can't be found anywhere else.
+Thank you for creating your account with {{appName}}! Your account has been successfully created and is ready to use.
 
-YOUR EXCLUSIVE COUPON: {{couponCode}}
+Here's what you can do next:
+- Browse our catalog of gaming products
+- Top up your favorite games
+- Purchase subscriptions at competitive prices
+- Redeem gift cards for various platforms
 
-Discount: {{discountDisplay}}
+We recommend verifying your email and completing your profile for a seamless experience.
 
-Coupon Details:
-- Usage Limit: {{usagePerUser}} time(s) for you personally
-- Valid Until: {{expiryDate}}
-- Issued Date: {{issuedDate}}
+Complete your profile: {{websiteUrl}}/profile
 
-This coupon is exclusively yours! Don't miss out on this special offer - it's valid for a limited time only.
-
-How to use: Simply enter the coupon code {{couponCode}} during checkout to apply your exclusive discount.
-
-Visit {{websiteUrl}} to shop now and use your coupon!
-
-Thank you for being a valued member of {{appName}}!
-
-If you have any questions about your coupon, please contact us at {{supportEmail}}
+Welcome to the {{appName}} family!
+If you have any questions, please contact us at {{supportEmail}}
 
 © {{currentYear}} {{appName}}. All rights reserved.`,
-        availableVariables: [
-          "customerName",
-          "userEmail",
-          "couponCode",
-          "discountValue",
-          "discountType",
-          "maxDiscount",
-          "discountDisplay",
-          "discountText",
-          "isPercentage",
-          "expiryDate",
-          "usageLimit",
-          "usagePerUser",
-          "issuedDate",
-          "appName",
-          "supportEmail",
-          "websiteUrl",
-          "currentYear",
-        ],
+        isActive: true,
+      },
+      {
+        type: "order_cancelled",
+        subject: "Order Cancelled - {{orderId}} | {{appName}}",
+        htmlContent: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Cancelled</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #e66465 0%, #9198e5 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+    .content { padding: 20px; }
+    .order-details { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    .message-box { background-color: #ffe8e8; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #e66465; }
+    .footer { text-align: center; padding: 20px; color: #666; border-top: 1px solid #eee; }
+    .btn { display: inline-block; background-color: #6c757d; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Order Cancelled</h1>
+      <p>Information about your cancelled order</p>
+    </div>
+    <div class="content">
+      <p>Dear {{userName}},</p>
+      <p>We're sorry to inform you that your order has been cancelled.</p>
+        
+      <div class="order-details">
+        <h3>Cancelled Order Details:</h3>
+        <p><strong>Order ID:</strong> {{orderId}}</p>
+        <p><strong>Product:</strong> {{productName}}</p>
+        <p><strong>Quantity:</strong> {{quantity}}</p>
+        <p><strong>Amount:</strong> {{currency}} {{amount}}</p>
+        <p><strong>Cancelled On:</strong> {{cancellationDate}}</p>
+      </div>
+      
+      <div class="message-box">
+        <p>If this cancellation was unexpected or if you have any questions, please contact our support team immediately.</p>
+        <p>We apologize for any inconvenience caused and appreciate your understanding.</p>
+      </div>
+      
+      <div style="text-align: center;">
+        <a href="{{websiteUrl}}/contact" class="btn">Contact Support</a>
+      </div>
+    </div>
+    <div class="footer">
+      <p>Thank you for your understanding.</p>
+      <p>If you have any questions, please contact us at {{supportEmail}}</p>
+      <p>&copy; {{currentYear}} {{appName}}. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>`,
+        textContent: `Order Cancelled - {{orderId}} | {{appName}}
+
+Dear {{userName}},
+
+We're sorry to inform you that your order has been cancelled.
+
+Cancelled Order Details:
+- Order ID: {{orderId}}
+- Product: {{productName}}
+- Quantity: {{quantity}}
+- Amount: {{currency}} {{amount}}
+- Cancelled On: {{cancellationDate}}
+
+If this cancellation was unexpected or if you have any questions, please contact our support team immediately.
+
+We apologize for any inconvenience caused and appreciate your understanding.
+
+Contact Support: {{websiteUrl}}/contact
+
+Thank you for your understanding.
+If you have any questions, please contact us at {{supportEmail}}
+
+© {{currentYear}} {{appName}}. All rights reserved.`,
+        isActive: true,
       },
     ];
 
@@ -962,4 +711,6 @@ module.exports = {
   initializeDefaultTemplates,
   getTemplateVariables,
   getTemplateVariablesSummary,
+  toggleTemplateStatus,
+  getTemplateStatusSummary,
 };

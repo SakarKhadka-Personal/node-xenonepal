@@ -8,6 +8,8 @@ const {
   initializeDefaultTemplates,
   getTemplateVariables,
   getTemplateVariablesSummary,
+  toggleTemplateStatus,
+  getTemplateStatusSummary,
 } = require("./emailTemplate.controller");
 const emailService = require("./emailService");
 const User = require("../user/user.model");
@@ -246,6 +248,12 @@ router.put("/templates/:id", updateTemplate);
 
 // Delete email template
 router.delete("/templates/:id", deleteTemplate);
+
+// Toggle template status (enable/disable)
+router.patch("/templates/:id/toggle", verifyAdmin, toggleTemplateStatus);
+
+// Get template status summary
+router.get("/templates/status/summary", verifyAdmin, getTemplateStatusSummary);
 
 // Get template variables with documentation
 router.get("/templates/:type/variables", getTemplateVariables);

@@ -6,14 +6,15 @@ const emailTemplateSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: [
-        "order_completion",
-        "order_delivered",
-        "user_registration",
-        "welcome",
-        "test_email",
-        "admin_new_order",
-        "admin_order_status_update",
-        "exclusive_coupon",
+        "order_completion", // When order is placed
+        "order_delivered", // When order is delivered
+        "order_cancelled", // When order is cancelled
+        "user_registration", // When user registers
+        "welcome", // When user logs in
+        "test_email", // For testing
+        "admin_new_order", // Admin notification for new orders
+        "admin_order_status_update", // Admin notification for order status changes
+        "exclusive_coupon", // When user receives a coupon
       ],
       unique: true,
     },
@@ -33,7 +34,8 @@ const emailTemplateSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
-    }, // Available variables for templating
+    },
+    // Available variables for templating
     availableVariables: {
       type: [String],
       default: [],

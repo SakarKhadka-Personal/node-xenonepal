@@ -218,9 +218,13 @@ const syncUser = async (req, res) => {
     let user = await User.findOne({
       $or: [{ googleId }, { email }],
     });
-
     if (user) {
       try {
+        // Check if this is a login after more than 24 hours
+        const isReturningAfterLongTime = user.lastLogin
+          ? new Date() - new Date(user.lastLogin) > 24 * 60 * 60 * 1000
+          : true;
+
         // Update existing user
         user.lastLogin = new Date();
         if (googleId && !user.googleId) {
@@ -231,6 +235,22 @@ const syncUser = async (req, res) => {
         if (phone && !user.phone) user.phone = phone; // Only set if user doesn't have phone
 
         user = await user.save();
+
+        // Send welcome email for returning users (if they haven't logged in for over 24 hours)
+        if (isReturningAfterLongTime) {
+          try {
+            await emailService.sendWelcomeEmail(user.email, {
+              name: user.name,
+              email: user.email,
+            });
+          } catch (emailError) {
+            console.error(
+              "Failed to send welcome email to returning user:",
+              emailError
+            );
+            // Don't fail user sync if email fails
+          }
+        }
       } catch (saveErr) {
         console.error("Error saving existing user:", saveErr);
         return res.status(500).json({
@@ -257,16 +277,24 @@ const syncUser = async (req, res) => {
           message: "Error creating new user",
           error: createErr.message,
         });
-      }
-
-      // Send welcome email for new users
+      } // Send welcome and registration emails for new users
       try {
+        // Send registration confirmation email
+        await emailService.sendRegistrationEmail(user.email, {
+          name: user.name,
+          email: user.email,
+        });
+
+        // Also send welcome email
         await emailService.sendWelcomeEmail(user.email, {
           name: user.name,
           email: user.email,
         });
       } catch (emailError) {
-        console.error("Failed to send welcome email:", emailError);
+        console.error(
+          "Failed to send welcome/registration emails:",
+          emailError
+        );
         // Don't fail user creation if email fails
       }
     }
