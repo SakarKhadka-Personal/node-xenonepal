@@ -48,17 +48,66 @@ const getPublicSettings = async (req, res) => {
 const updateSettings = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Debug logging
+    console.log("Update settings request:");
+    console.log("ID:", id);
+    console.log("Request body:", req.body);
+
+    // First check if the settings document exists
+    let settings = await Setting.findById(id);
+
+    if (!settings) {
+      console.log("Settings not found for ID:", id);
+
+      // Try to find any settings document
+      settings = await Setting.findOne();
+
+      if (!settings) {
+        console.log("No settings document found, creating new one");
+        // Create new settings document with provided data and defaults
+        const newSettings = new Setting({
+          appName: "XenoNepal",
+          appCurrency: "NPR",
+          ...req.body,
+        });
+        await newSettings.save();
+        console.log("New settings created:", newSettings._id);
+        return res.status(201).json(newSettings);
+      } else {
+        console.log(
+          "Found existing settings, updating with correct ID:",
+          settings._id
+        );
+        // Update the existing settings with the new data
+        const updatedSettings = await Setting.findByIdAndUpdate(
+          settings._id,
+          req.body,
+          {
+            new: true,
+            runValidators: true,
+          }
+        );
+        console.log("Settings updated successfully:", updatedSettings._id);
+        return res.status(200).json(updatedSettings);
+      }
+    }
+
+    // Normal update flow
     const updatedSettings = await Setting.findByIdAndUpdate(id, req.body, {
       new: true,
       runValidators: true,
     });
-    if (!updatedSettings) {
-      return res.status(404).json({ message: "Settings not found" });
-    }
+
+    console.log("Settings updated successfully:", updatedSettings._id);
     res.status(200).json(updatedSettings);
   } catch (error) {
     console.error("Error updating settings:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Error details:", error.message);
+    console.error("Error stack:", error.stack);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
   }
 };
 
