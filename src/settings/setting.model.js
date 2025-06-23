@@ -96,27 +96,6 @@ const settingSchema = new mongoose.Schema(
         default: true,
       },
     },
-    // Analytics & Tracking
-    facebookPixelId: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-    googleAnalyticsId: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-    googleTagManagerId: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-    hotjarId: {
-      type: String,
-      trim: true,
-      default: "",
-    },
     // Domain & API Settings
     domainSettings: {
       productionDomain: {
